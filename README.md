@@ -33,12 +33,12 @@
 
 ### GitHub에서 직접 설치
 ```bash
-pip install git+https://github.com/hunseop/fpat.git
+pip install git+https://github.com/khunseop/fpat.git
 ```
 
 ### 로컬 개발 설치
 ```bash
-git clone https://github.com/hunseop/fpat.git
+git clone https://github.com/khunseop/fpat.git
 cd fpat
 pip install -e .
 ```
@@ -285,7 +285,7 @@ MIT License - 자세한 내용은 [LICENSE](LICENSE) 파일을 참조하세요.
 
 **Hoon**
 - Email: khunseop@gmail.com
-- GitHub: [@hunseop](https://github.com/hunseop)
+- GitHub: [@khunseop](https://github.com/khunseop)
 
 ## 🆕 변경 사항
 

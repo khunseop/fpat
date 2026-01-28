@@ -53,9 +53,9 @@ docs = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/hunseop/fpat"
-"Bug Reports" = "https://github.com/hunseop/fpat/issues"
-"Source" = "https://github.com/hunseop/fpat"
+"Homepage" = "https://github.com/khunseop/fpat"
+"Bug Reports" = "https://github.com/khunseop/fpat/issues"
+"Source" = "https://github.com/khunseop/fpat"
 
 
 
