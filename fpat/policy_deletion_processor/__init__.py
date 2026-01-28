@@ -7,6 +7,9 @@
 - 관련 정책 및 객체 의존성 분석
 
 사용법:
+    # CLI 사용 (권장)
+    python -m fpat.policy_deletion_processor.cli --policy-file policy.xlsx --run-all
+    
     # 개별 모듈 import
     from fpat.policy_deletion_processor.core import config_manager
     from fpat.policy_deletion_processor.processors import policy_usage_processor
