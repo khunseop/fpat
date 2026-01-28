@@ -1,8 +1,11 @@
 include README.md
-include LICENSE
 include requirements.txt
 include pyproject.toml
-recursive-include modules *.py
+recursive-include fpat *.py
+recursive-include docs *.md
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
-recursive-exclude * .DS_Store 
+recursive-exclude * .DS_Store
+recursive-exclude * *.db
+recursive-exclude * *.sqlite
+recursive-exclude * *.sqlite3 

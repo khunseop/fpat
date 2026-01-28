@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Hoon Firewall Modules 라이브러리 빌드 및 설치 스크립트
+# FPAT (Firewall Policy Analysis Tool) 라이브러리 빌드 및 설치 스크립트
 
-echo "🚀 Hoon Firewall Modules 라이브러리 빌드 시작"
+echo "🚀 FPAT (Firewall Policy Analysis Tool) 라이브러리 빌드 시작"
 
 # 기존 빌드 파일 정리
 echo "1. 기존 빌드 파일 정리 중..."
@@ -43,22 +43,26 @@ fi
 
 # 테스트 실행
 echo "6. 라이브러리 테스트 실행 중..."
-python test_library.py
-if [ $? -eq 0 ]; then
-    echo "   ✅ 테스트 통과"
+if [ -f "tests/test_library.py" ]; then
+    python tests/test_library.py
+    if [ $? -eq 0 ]; then
+        echo "   ✅ 테스트 통과"
+    else
+        echo "   ⚠️  테스트 실패 - 하지만 설치는 완료되었습니다"
+    fi
 else
-    echo "   ⚠️  테스트 실패 - 하지만 설치는 완료되었습니다"
+    echo "   ⚠️  테스트 파일을 찾을 수 없습니다 (tests/test_library.py)"
 fi
 
 echo ""
 echo "🎉 라이브러리 빌드 및 설치 완료!"
 echo ""
 echo "📚 사용법:"
-echo "   python -c 'from hoon_firewall_modules import PolicyComparator; print(\"라이브러리 import 성공!\")'"
+echo "   python -c 'from fpat import PolicyComparator; print(\"라이브러리 import 성공!\")'"
 echo ""
 echo "📦 패키지 파일 위치: dist/"
 echo "   - $(ls dist/*.whl 2>/dev/null || echo '빌드된 wheel 파일 없음')"
 echo "   - $(ls dist/*.tar.gz 2>/dev/null || echo '빌드된 source 파일 없음')"
-
-# git clone 할 필요 없음!
-pip install git+https://github.com/hunseop/hoon_firewall_modules.git 
+echo ""
+echo "📦 GitHub에서 직접 설치:"
+echo "   pip install git+https://github.com/khunseop/fpat.git" 

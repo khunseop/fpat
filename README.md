@@ -256,11 +256,11 @@ from fpat.policy_deletion_processor.utils import excel_manager
 
 ```
 fpat/
-├── modules/
-│   ├── policy_comparator/     # 정책 비교 기능
-│   ├── firewall_module/       # 방화벽 연동 기능
-│   ├── firewall_analyzer/       # 정책 분석 기능
-│   └── policy_deletion_processor/       # 삭제 시나리오 처리
+├── policy_comparator/          # 정책 비교 기능
+├── firewall_module/            # 방화벽 연동 기능
+├── firewall_analyzer/         # 정책 분석 기능
+├── policy_deletion_processor/ # 삭제 시나리오 처리
+└── paloalto_parameter_checker/ # Palo Alto 파라미터 체크 도구
 ```
 
 ## 🔧 지원 방화벽
@@ -276,10 +276,17 @@ fpat/
 - pandas >= 1.3.0
 - openpyxl >= 3.0.0
 - requests >= 2.25.0
+- lxml >= 4.6.0
+- python-dateutil >= 2.8.0
+- urllib3 == 1.26.12
+- paramiko >= 3.0.0
+- scp >= 0.14.0
+
+자세한 의존성 목록은 `requirements.txt` 또는 `pyproject.toml`을 참조하세요.
 
 ## 📄 라이선스
 
-MIT License - 자세한 내용은 [LICENSE](LICENSE) 파일을 참조하세요.
+Proprietary License - 이 소프트웨어는 독점 라이선스 하에 배포됩니다.
 
 ## 👤 작성자
 
@@ -300,4 +307,10 @@ MIT License - 자세한 내용은 [LICENSE](LICENSE) 파일을 참조하세요.
 - 초기 릴리스
 - 정책 비교 기능 추가
 - 다중 벤더 방화벽 지원
-- 정책 분석 기능 추가 
+- 정책 분석 기능 추가
+
+## 📝 참고사항
+
+- 프로젝트의 최신 정보는 [GitHub 저장소](https://github.com/khunseop/fpat)에서 확인할 수 있습니다.
+- 버그 리포트나 기능 제안은 [Issues](https://github.com/khunseop/fpat/issues)에 등록해주세요.
+- 각 모듈의 상세 문서는 해당 모듈 디렉토리의 README.md 파일을 참조하세요. 

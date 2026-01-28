@@ -214,4 +214,14 @@ $RECYCLE.BIN/
 temp/
 temp.*
 *.tmp
-*.bak 
+*.bak
+
+# Data files and databases
+data/
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# Backup directories
+backup/ 
