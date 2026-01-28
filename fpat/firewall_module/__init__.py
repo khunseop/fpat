@@ -11,8 +11,17 @@
 - 방화벽 추상 인터페이스 (FirewallInterface)
 - 벤더별 컬렉터 팩토리 (CollectorFactory)
 - 데이터 익스포터 (Exporter)
+- CLI 인터페이스 (명령줄에서 직접 사용 가능)
 - 로깅 및 예외 처리 시스템
 - 입력 검증 및 성능 최적화
+
+사용법:
+    # CLI 사용 (권장)
+    python -m fpat.firewall_module.cli --vendor paloalto --hostname 192.168.1.1 --username admin --export-type policy --output policies.xlsx
+    
+    # 프로그래밍 방식
+    from fpat.firewall_module import export_policy_to_excel
+    export_policy_to_excel(vendor="paloalto", hostname="192.168.1.1", ...)
 """
 
 # 핵심 클래스

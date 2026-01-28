@@ -30,7 +30,85 @@
 | SECUI MF2 | `mf2` | 정책, 객체, 그룹 |
 | Mock (테스트용) | `mock` | 모든 기능 (가상 데이터) |
 
-## 기본 사용법
+## CLI 사용법
+
+### 기본 사용법
+
+```bash
+# PaloAlto 정책 추출
+python -m fpat.firewall_module.cli \
+    --vendor paloalto \
+    --hostname 192.168.1.1 \
+    --username admin \
+    --export-type policy \
+    --output ./policies.xlsx
+
+# 전체 데이터 추출 (비밀번호 프롬프트)
+python -m fpat.firewall_module.cli \
+    --vendor paloalto \
+    --hostname firewall.example.com \
+    --username admin \
+    --export-type all \
+    --output ./complete_data.xlsx
+
+# 환경 변수에서 비밀번호 읽기
+export FIREWALL_PASSWORD="your_password"
+python -m fpat.firewall_module.cli \
+    --vendor ngf \
+    --hostname 10.0.0.1 \
+    --username admin \
+    --export-type policy \
+    --output ./ngf_policies.xlsx
+```
+
+### CLI 옵션
+
+- `--vendor`, `-v`: 방화벽 벤더 (필수) - `paloalto`, `ngf`, `mf2`, `mock`
+- `--hostname`, `-H`: 방화벽 호스트명 또는 IP 주소 (필수)
+- `--username`, `-u`: 방화벽 로그인 사용자명 (필수)
+- `--password`, `-p`: 방화벽 로그인 비밀번호 (선택, 지정하지 않으면 프롬프트 또는 환경 변수 사용)
+- `--export-type`, `-t`: 추출할 데이터 타입 (필수) - `policy`, `address`, `address_group`, `service`, `service_group`, `usage`, `all`
+- `--output`, `-o`: 출력 Excel 파일 경로 (필수)
+- `--config-type`, `-c`: 설정 타입 (PaloAlto 전용, 기본값: `running`) - `running`, `candidate`
+- `--chunk-size`: 대용량 데이터 처리 시 청크 크기 (기본값: 1000)
+- `--timeout`: 연결 타임아웃 초 (기본값: 30)
+- `--no-test-connection`: 연결 테스트 건너뛰기
+- `--verbose`: 상세 로그 출력
+- `--password-env`: 비밀번호를 읽을 환경 변수 이름 (기본값: `FIREWALL_PASSWORD`)
+
+### 자동화 예제
+
+```bash
+#!/bin/bash
+# 방화벽 데이터 자동 추출 스크립트
+
+VENDOR="paloalto"
+HOSTNAME="192.168.1.1"
+USERNAME="admin"
+PASSWORD="your_password"
+OUTPUT_DIR="./exports"
+
+# 정책 추출
+python -m fpat.firewall_module.cli \
+    --vendor "$VENDOR" \
+    --hostname "$HOSTNAME" \
+    --username "$USERNAME" \
+    --password "$PASSWORD" \
+    --export-type policy \
+    --output "$OUTPUT_DIR/policies_$(date +%Y%m%d).xlsx"
+
+# 전체 데이터 추출
+python -m fpat.firewall_module.cli \
+    --vendor "$VENDOR" \
+    --hostname "$HOSTNAME" \
+    --username "$USERNAME" \
+    --password "$PASSWORD" \
+    --export-type all \
+    --output "$OUTPUT_DIR/complete_$(date +%Y%m%d).xlsx" \
+    --verbose
+```
+
+## 프로그래밍 방식 사용법
 
 ### 1. 간단한 정책 추출
 

@@ -72,6 +72,28 @@ comparator.compare_policies()
 
 ### 2. 방화벽 연동
 
+#### CLI 사용 (권장)
+
+```bash
+# PaloAlto 정책 추출
+python -m fpat.firewall_module.cli \
+    --vendor paloalto \
+    --hostname 192.168.1.1 \
+    --username admin \
+    --export-type policy \
+    --output policies.xlsx
+
+# 전체 데이터 추출
+python -m fpat.firewall_module.cli \
+    --vendor paloalto \
+    --hostname 192.168.1.1 \
+    --username admin \
+    --export-type all \
+    --output complete_data.xlsx
+```
+
+#### 프로그래밍 방식
+
 ```python
 from fpat import FirewallCollectorFactory
 
@@ -86,6 +108,22 @@ firewall = FirewallCollectorFactory.get_collector(
 # 정책 데이터 수집
 policies = firewall.export_security_rules()
 objects = firewall.export_network_objects()
+```
+
+또는 `export_policy_to_excel` 함수 사용:
+
+```python
+from fpat.firewall_module import export_policy_to_excel
+
+# 정책 추출 및 Excel 저장
+output_file = export_policy_to_excel(
+    vendor="paloalto",
+    hostname="192.168.1.1",
+    username="admin",
+    password="password",
+    export_type="policy",
+    output_path="./policies.xlsx"
+)
 ```
 
 ### 3. 정책 분석
