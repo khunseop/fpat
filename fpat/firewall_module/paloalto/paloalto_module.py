@@ -529,3 +529,100 @@ class PaloAltoAPI:
         except Exception as e:
             logging.error(f"명령어 실행 중 오류 발생: {e}")
             return []
+
+
+    def export_nat_rules(self, config_type: str = 'running') -> pd.DataFrame:
+        """
+        NAT 정책 정보를 DataFrame으로 반환합니다.
+
+        :param config_type: 'running' 또는 기타
+        :return: 보안 규칙 DataFrame
+        """
+        config_xml = self.get_config(config_type)
+        tree = ET.fromstring(config_xml)
+        vsys_entries = tree.findall('./result/config/devices/entry/vsys/entry')
+        nat_rules = []
+
+        for vsys in vsys_entries:
+            vsys_name = vsys.attrib.get('name')
+            rulebase = vsys.findall('./rulebase/nat/rules/entry')
+            for idx, rule in enumerate(rulebase):
+                rule_name = str(rule.attrib.get('name'))
+                disabled_list = self._get_member_texts(rule.findall('./disabled'))
+                disabled_status = "N" if self.list_to_string(disabled_list) == "yes" else "Y"
+                nat_type = self.list_to_string(self._get_member_texts(rule.findall('./nat-type')))
+                
+                source_zone = self.list_to_string(self._get_member_texts(rule.findall('./from/member')))
+                destination_zone = self.list_to_string(self._get_member_texts(rule.findall('./to/member')))
+                destination_interface = self.list_to_string(self._get_member_texts(rule.findall('./to-interface')))
+                source = self.list_to_string(self._get_member_texts(rule.findall('./source/member')))
+                destination = self.list_to_string(self._get_member_texts(rule.findall('./destination/member')))
+                service = self.list_to_string(self._get_member_texts(rule.findall('./service')))
+                source_translation = self.list_to_string(self._get_member_texts(rule.findall('./source-translation/static-ip/translated-address')))
+                destination_translation = self.list_to_string(self._get_member_texts(rule.findall('./destination-translation/translated-address')))
+
+                
+                description_list = self._get_member_texts(rule.findall('./description'))
+                description = self.list_to_string([desc.replace('\n', ' ') for desc in description_list])
+
+                rule_info = {
+                    "Vsys": vsys_name,
+                    "Seq": idx + 1,
+                    "Rule Name": rule_name,
+                    "Enable": disabled_status,
+                    "Original Packet Source Zone": source_zone,
+                    "Original Packet Destination Zone": destination_zone,
+                    "Original Packet Destination Interface": destination_interface,
+                    "Original Packet Source Address": source,
+                    "Original Packet Destination Address": destination,
+                    "Translated Packet Source Translation": source_translation,
+                    "Translated Packet Destination Translation": destination_translation,
+                    "Description": description,
+                }
+                nat_rules.append(rule_info)
+
+        return pd.DataFrame(nat_rules)
+
+    def show_interface_management(self):
+        '''
+        임시 함수로 추후 개선 필요
+        '''
+        params = (
+            ('type', 'op'),
+            ('cmd', '<show><interface>management</interface></show>'),
+            ('key', self.api_key)
+        )
+        response = self.get_api_data(params)
+        tree = ET.fromstring(response.text)
+        print(response.text)
+        speed = tree.findtext("./result/info/speed")
+
+        return speed
+
+    def show_cpu(self):
+        '''
+        임시 함수로 추후 개선 필요
+        '''
+        params = (
+            ('type', 'op'),
+            ('cmd', '<show><running><resource-monitor><day><last>1</last></day></resource-monitor></running></show>'),
+            ('key', self.api_key)
+        )
+        response = self.get_api_data(params)
+        tree = ET.fromstring(response.text)
+        print(response.text)
+
+    def show_system_state(self):
+        '''
+        임시 함수로 추후 개선 필요
+        '''
+        params = (
+            ('type', 'op'),
+            ('cmd', '<show><system><state/></system></show>'),
+            ('key', self.api_key)
+        )
+        response = self.get_api_data(params)
+        tree = ET.fromstring(response.text)
+        
+        with open("system_state.txt", "w") as f:
+            f.write(response.text)
