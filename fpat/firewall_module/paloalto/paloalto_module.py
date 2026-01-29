@@ -536,7 +536,7 @@ class PaloAltoAPI:
         NAT 정책 정보를 DataFrame으로 반환합니다.
 
         :param config_type: 'running' 또는 기타
-        :return: 보안 규칙 DataFrame
+        :return: NAT 정책 DataFrame
         """
         config_xml = self.get_config(config_type)
         tree = ET.fromstring(config_xml)
@@ -561,7 +561,6 @@ class PaloAltoAPI:
                 source_translation = self.list_to_string(self._get_member_texts(rule.findall('./source-translation/static-ip/translated-address')))
                 destination_translation = self.list_to_string(self._get_member_texts(rule.findall('./destination-translation/translated-address')))
 
-                
                 description_list = self._get_member_texts(rule.findall('./description'))
                 description = self.list_to_string([desc.replace('\n', ' ') for desc in description_list])
 
@@ -570,11 +569,13 @@ class PaloAltoAPI:
                     "Seq": idx + 1,
                     "Rule Name": rule_name,
                     "Enable": disabled_status,
+                    "NAT Type": nat_type,
                     "Original Packet Source Zone": source_zone,
                     "Original Packet Destination Zone": destination_zone,
                     "Original Packet Destination Interface": destination_interface,
                     "Original Packet Source Address": source,
                     "Original Packet Destination Address": destination,
+                    "Service": service,
                     "Translated Packet Source Translation": source_translation,
                     "Translated Packet Destination Translation": destination_translation,
                     "Description": description,
@@ -583,46 +584,158 @@ class PaloAltoAPI:
 
         return pd.DataFrame(nat_rules)
 
-    def show_interface_management(self):
-        '''
-        임시 함수로 추후 개선 필요
-        '''
-        params = (
-            ('type', 'op'),
-            ('cmd', '<show><interface>management</interface></show>'),
-            ('key', self.api_key)
-        )
-        response = self.get_api_data(params)
-        tree = ET.fromstring(response.text)
-        print(response.text)
-        speed = tree.findtext("./result/info/speed")
+    def get_interface_management_info(self) -> pd.DataFrame:
+        """
+        관리 인터페이스 정보를 DataFrame으로 반환합니다.
 
-        return speed
+        :return: 관리 인터페이스 정보 DataFrame
+        """
+        try:
+            params = (
+                ('type', 'op'),
+                ('cmd', '<show><interface>management</interface></show>'),
+                ('key', self.api_key)
+            )
+            response = self.get_api_data(params)
+            tree = ET.fromstring(response.text)
+            
+            info_elem = tree.find("./result/info")
+            if info_elem is None:
+                logging.warning("관리 인터페이스 정보를 찾을 수 없습니다")
+                return pd.DataFrame()
+            
+            interface_info = {
+                "hostname": self.hostname,
+                "name": info_elem.findtext("./name") or "",
+                "state": info_elem.findtext("./state") or "",
+                "ip": info_elem.findtext("./ip") or "",
+                "netmask": info_elem.findtext("./netmask") or "",
+                "speed": info_elem.findtext("./speed") or "",
+                "duplex": info_elem.findtext("./duplex") or "",
+                "link_state": info_elem.findtext("./link-state") or "",
+            }
+            
+            return pd.DataFrame(interface_info, index=[0])
+        except Exception as error:
+            logging.error("관리 인터페이스 정보 조회 중 오류 발생: %s", error)
+            return pd.DataFrame()
 
-    def show_cpu(self):
-        '''
-        임시 함수로 추후 개선 필요
-        '''
-        params = (
-            ('type', 'op'),
-            ('cmd', '<show><running><resource-monitor><day><last>1</last></day></resource-monitor></running></show>'),
-            ('key', self.api_key)
-        )
-        response = self.get_api_data(params)
-        tree = ET.fromstring(response.text)
-        print(response.text)
+    def get_resource_usage(self, days: int = 1) -> pd.DataFrame:
+        """
+        리소스 사용률 정보를 DataFrame으로 반환합니다.
 
-    def show_system_state(self):
-        '''
-        임시 함수로 추후 개선 필요
-        '''
-        params = (
-            ('type', 'op'),
-            ('cmd', '<show><system><state/></system></show>'),
-            ('key', self.api_key)
-        )
-        response = self.get_api_data(params)
-        tree = ET.fromstring(response.text)
-        
-        with open("system_state.txt", "w") as f:
-            f.write(response.text)
+        :param days: 조회할 일수 (기본값: 1)
+        :return: 리소스 사용률 DataFrame
+        """
+        try:
+            params = (
+                ('type', 'op'),
+                ('cmd', f'<show><running><resource-monitor><day><last>{days}</last></day></resource-monitor></running></show>'),
+                ('key', self.api_key)
+            )
+            response = self.get_api_data(params)
+            tree = ET.fromstring(response.text)
+            
+            resource_data = []
+            result_elem = tree.find("./result")
+            if result_elem is None:
+                logging.warning("리소스 사용률 정보를 찾을 수 없습니다")
+                return pd.DataFrame()
+            
+            # CPU 사용률 정보 추출
+            cpu_elem = result_elem.find("./cpu")
+            if cpu_elem is not None:
+                cpu_info = {
+                    "hostname": self.hostname,
+                    "resource_type": "CPU",
+                    "average": cpu_elem.findtext("./average") or "",
+                    "maximum": cpu_elem.findtext("./maximum") or "",
+                    "minimum": cpu_elem.findtext("./minimum") or "",
+                }
+                resource_data.append(cpu_info)
+            
+            # 메모리 사용률 정보 추출
+            memory_elem = result_elem.find("./memory")
+            if memory_elem is not None:
+                memory_info = {
+                    "hostname": self.hostname,
+                    "resource_type": "Memory",
+                    "average": memory_elem.findtext("./average") or "",
+                    "maximum": memory_elem.findtext("./maximum") or "",
+                    "minimum": memory_elem.findtext("./minimum") or "",
+                }
+                resource_data.append(memory_info)
+            
+            # 세션 사용률 정보 추출
+            session_elem = result_elem.find("./session")
+            if session_elem is not None:
+                session_info = {
+                    "hostname": self.hostname,
+                    "resource_type": "Session",
+                    "average": session_elem.findtext("./average") or "",
+                    "maximum": session_elem.findtext("./maximum") or "",
+                    "minimum": session_elem.findtext("./minimum") or "",
+                }
+                resource_data.append(session_info)
+            
+            if not resource_data:
+                logging.warning("리소스 사용률 데이터가 없습니다")
+                return pd.DataFrame()
+            
+            return pd.DataFrame(resource_data)
+        except Exception as error:
+            logging.error("리소스 사용률 조회 중 오류 발생: %s", error)
+            return pd.DataFrame()
+
+    def get_system_state_detailed(self) -> pd.DataFrame:
+        """
+        상세 시스템 상태 정보를 DataFrame으로 반환합니다.
+
+        :return: 시스템 상태 정보 DataFrame
+        """
+        try:
+            params = (
+                ('type', 'op'),
+                ('cmd', '<show><system><state/></system></show>'),
+                ('key', self.api_key)
+            )
+            response = self.get_api_data(params)
+            tree = ET.fromstring(response.text)
+            
+            result_elem = tree.find("./result")
+            if result_elem is None:
+                logging.warning("시스템 상태 정보를 찾을 수 없습니다")
+                return pd.DataFrame()
+            
+            # 시스템 상태 정보를 딕셔너리로 수집
+            state_info = {"hostname": self.hostname}
+            
+            # 주요 설정 제한값 추출
+            result_text = result_elem.text
+            if result_text:
+                for line in result_text.split('\n'):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    
+                    # cfg.general.max-* 패턴 추출
+                    if ':' in line:
+                        key, value = line.split(':', 1)
+                        key = key.strip().replace('cfg.general.', '').replace('-', '_')
+                        state_info[key] = value.strip()
+            
+            # XML 요소에서 직접 추출 가능한 정보
+            for child in result_elem:
+                tag_name = child.tag.replace('-', '_')
+                text_value = child.text.strip() if child.text else ""
+                if text_value:
+                    state_info[tag_name] = text_value
+            
+            if len(state_info) == 1:  # hostname만 있는 경우
+                logging.warning("시스템 상태 데이터가 없습니다")
+                return pd.DataFrame()
+            
+            return pd.DataFrame(state_info, index=[0])
+        except Exception as error:
+            logging.error("시스템 상태 조회 중 오류 발생: %s", error)
+            return pd.DataFrame()
