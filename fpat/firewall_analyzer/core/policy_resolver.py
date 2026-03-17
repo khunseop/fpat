@@ -64,7 +64,7 @@ class PolicyResolver:
 
         return pd.DataFrame(rows)
 
-    def resolve(self, rules_df, network_object_df, network_group_object_df, service_object_df, service_group_object_df) -> pd.DataFrame:
+    def resolve(self, rules_df, network_object_df, network_group_object_df, service_object_df, service_group_object_df, rule_type = 'security') -> pd.DataFrame:
         try:
 
             network_group_dict = network_group_object_df.set_index('Group Name')['Entry'].to_dict()
@@ -76,17 +76,33 @@ class PolicyResolver:
             service_group_dict = service_group_object_df.set_index('Group Name')['Entry'].to_dict()
             service_object_df = self.combine_protocol_port(service_object_df)
             service_dict = service_object_df.set_index('Name')['Value'].to_dict()
-
-            rules_df['Resolved Source'] = rules_df['Source'].apply(lambda x: self.process_cell(x, network_group_dict))
-            rules_df['Resolved Destination'] = rules_df['Destination'].apply(lambda x: self.process_cell(x, network_group_dict))
-            rules_df['Resolved Service'] = rules_df['Service'].apply(lambda x: self.process_cell(x, service_group_dict))
-
-            rules_df['Extracted Source'] = rules_df['Resolved Source'].apply(lambda x: self.replace_object_to_value(x, network_dict))
-            rules_df['Extracted Destination'] = rules_df['Resolved Destination'].apply(lambda x: self.replace_object_to_value(x, network_dict))
-            rules_df['Extracted Service'] = rules_df['Resolved Service'].apply(lambda x: self.replace_object_to_value(x, service_dict))
             
-            rules_df.drop(columns=['Resolved Source', 'Resolved Destination', 'Resolved Service'], inplace=True)
+            if rule_type == "security":
+                rules_df['Resolved Source'] = rules_df['Source'].apply(lambda x: self.process_cell(x, network_group_dict))
+                rules_df['Resolved Destination'] = rules_df['Destination'].apply(lambda x: self.process_cell(x, network_group_dict))
+                rules_df['Resolved Service'] = rules_df['Service'].apply(lambda x: self.process_cell(x, service_group_dict))
 
+                rules_df['Extracted Source'] = rules_df['Resolved Source'].apply(lambda x: self.replace_object_to_value(x, network_dict))
+                rules_df['Extracted Destination'] = rules_df['Resolved Destination'].apply(lambda x: self.replace_object_to_value(x, network_dict))
+                rules_df['Extracted Service'] = rules_df['Resolved Service'].apply(lambda x: self.replace_object_to_value(x, service_dict))
+ 
+                rules_df.drop(columns=['Resolved Source', 'Resolved Destination', 'Resolved Service'], inplace=True)
+
+            elif rule_type == "nat":
+                rules_df['Resolved OG Source'] = rules_df['Original Packet Source Address'].apply(lambda x: self.process_cell(x, network_group_dict))
+                rules_df['Resolved OG Destination'] = rules_df['Destination'].apply(lambda x: self.process_cell(x, network_group_dict))
+                rules_df['Resolved TS Source'] = rules_df['Translated Packet Source Translation'].apply(lambda x: self.process_cell(x, network_group_dict))
+                rules_df['Resolved TS Destination'] = rules_df['Translated Packet Destination Translation'].apply(lambda x: self.process_cell(x, network_group_dict))
+                rules_df['Resolved OG Service'] = rules_df['Original Packet Service'].apply(lambda x: self.process_cell(x, service_group_dict))
+            
+                rules_df['Extracted OG Source'] = rules_df['Resolved OG Source'].apply(lambda x: self.replace_object_to_value(x, network_dict))
+                rules_df['Extracted OG Destination'] = rules_df['Resolved OG Destination'].apply(lambda x: self.replace_object_to_value(x, network_dict))
+                rules_df['Extracted TS Source'] = rules_df['Resolved TS Source'].apply(lambda x: self.replace_object_to_value(x, network_dict))
+                rules_df['Extracted TS Destination'] = rules_df['Resolved TS Destination'].apply(lambda x: self.replace_object_to_value(x, network_dict))
+                rules_df['Extracted OG Service'] = rules_df['Resolved OG Service'].apply(lambda x: self.replace_object_to_value(x, service_dict))
+
+                rules_df.drop(columns=['Resolved OG Source', 'Resolved OG Destination', 'Resolved TS Destination', 'Resolved TS Source', 'Resolved OG Service'], inplace=True)
+            
             return rules_df
         except Exception as e:
             return f"데이터 처리 중 오류 발생: {e}"
