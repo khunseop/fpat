@@ -90,7 +90,7 @@ class PolicyResolver:
 
             elif rule_type == "nat":
                 rules_df['Resolved OG Source'] = rules_df['Original Packet Source Address'].apply(lambda x: self.process_cell(x, network_group_dict))
-                rules_df['Resolved OG Destination'] = rules_df['Destination'].apply(lambda x: self.process_cell(x, network_group_dict))
+                rules_df['Resolved OG Destination'] = rules_df['Original Packet Destination Address'].apply(lambda x: self.process_cell(x, network_group_dict))
                 rules_df['Resolved TS Source'] = rules_df['Translated Packet Source Translation'].apply(lambda x: self.process_cell(x, network_group_dict))
                 rules_df['Resolved TS Destination'] = rules_df['Translated Packet Destination Translation'].apply(lambda x: self.process_cell(x, network_group_dict))
                 rules_df['Resolved OG Service'] = rules_df['Original Packet Service'].apply(lambda x: self.process_cell(x, service_group_dict))
