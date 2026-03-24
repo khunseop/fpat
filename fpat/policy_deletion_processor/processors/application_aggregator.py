@@ -69,6 +69,9 @@ class ApplicationAggregator:
             # 각 시트 데이터를 읽기
             df = pd.read_excel(xls, sheet_name=sheet_name)
 
+            if 'REQUEST_ID' in df.columns and '신청번호' in df.columns:
+                df = df.drop(columns="신청번호")
+
             # 처리된 컬럼들 기록
             processed_columns = []
 

@@ -204,7 +204,7 @@ class NotificationClassifier:
         filtered_df = df[
             (df['예외'].isna()) &
             (df['중복여부'].isna()) &
-            (df['신청이력'].isin(['GROUP', 'NORMAL'])) &
+            (df['신청이력'].isin(['GROUP', 'GENERAL'])) &
             (df['만료여부'] == '미만료') &
             (df['미사용여부'] == '미사용')
         ]

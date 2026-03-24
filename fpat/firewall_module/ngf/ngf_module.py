@@ -124,6 +124,49 @@ class NGFClient:
             logging.error("Exception during GET %s: %s", endpoint, e)
             return None
 
+    def get_system_device(self) -> dict:
+        """
+        dashboard 장비 상태 정보를 조회합니다.
+        """
+        endpoint = "/lr/dashboard?type=system_device_info"
+
+        from datetime import datetime, timedelta
+
+        # 현재 시간
+        now = datetime.now()
+
+        # 10분 전 시간
+        ten_minutes_ago = now - timedelta(minutes=10)
+
+        # 시간 포맷: "YYYY-MM-DD HH:MM:SS"
+        stime = ten_minutes_ago.strftime('%Y-%m-%d %H:%M:%S')
+        etime = now.strftime('%Y-%m-%d %H:%M:%S')
+
+        # params 딕셔너리에 type[stime], type[etime] 형태로 키 사용
+        params = {
+            'type': 'object',
+            'stime': stime,
+            'etime': etime
+        }
+
+        url = f"https://{self.hostname}{endpoint}"
+        try:
+            response = request.get(
+                url,
+                headers=self._get_headers(token=self.token),
+                verify=False,
+                timeout=self.timeout,
+                params=params
+            )
+            if response.status_code == 200:
+                logging.info("GET %s Success", endpoint)
+                return response.json()
+            else:
+                logging.error("GET %s Failed, status code: %s", endpoint, response.status_code)
+                return None
+        except Exception as e:
+            logging.error("Exception during GET %s: %s", endpoint, e)
+            return None
 
     def get_fw4_rules(self) -> dict:
         """
@@ -470,7 +513,38 @@ class NGFClient:
                 })
 
             return pd.DataFrame(group_details)
-        
+
+    def export_system_info(self, use_session: bool = True) -> pd.DataFrame:
+        """
+        NGF 객체 데이터를 파싱하여 pandas DataFrame으로 반환합니다.
+
+        Parameters:
+            object_type (str): 조회할 객체 타입
+            use_session (bool): 세션 관리 여부. True면 내부에서 로그인/로그아웃,
+                            False면 외부 세션 사용
+        """
+        def _get_data():
+
+            data = self.get_system_device()
+            print(data)
+
+            results = data.get("result", [])
+            if not results:
+                logging.warning(f"결과 데이터가 없습니다.")
+                return pd.DataFrame()
+            
+            df = pd.json_normalize(results, sep='_')
+
+            return df
+        try:
+            if use_session:
+                with self.session():
+                    return _get_data()
+            else:
+                return _get_data()
+        except Exception as e:
+            raise Exception(f"NGF 객체 데이터 수집 실패: {str(e)}")
+
 # ────────────── 모듈 테스트 예시 ──────────────
 if __name__ == '__main__':
     # NGFClient 객체 생성 후 보안 규칙 DataFrame을 출력하는 예시

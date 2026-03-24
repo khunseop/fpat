@@ -63,7 +63,7 @@ class PaloAltoCollector(FirewallInterface):
         """서비스 그룹 객체 정보를 반환합니다."""
         return self.api.export_service_group_objects()
     
-    def export_usage_logs(self, days: Optional[int] = None) -> pd.DataFrame:
+    def export_usage_logs(self, days: Optional[int] = 90) -> pd.DataFrame:
         """정책 사용이력을 DataFrame으로 반환합니다.
         
         Args:
@@ -84,7 +84,7 @@ class PaloAltoCollector(FirewallInterface):
         result_df = pd.concat(hit_counts, ignore_index=True)
         
         # 필요한 컬럼만 선택
-        result_df = result_df[['Rule Name', 'Last Hit Date', 'Unused Days']]
+        # result_df = result_df[['Rule Name', 'Last Hit Date', 'Unused Days']]
         
         # 미사용여부 컬럼 추가
         def determine_usage_status(unused_days):

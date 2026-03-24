@@ -50,13 +50,8 @@ class DuplicatePolicyClassifier:
                 return False
             
             info_df = pd.read_excel(info_file)
-            # auto_extension_id = info_df[info_df['REQUEST_STATUS'].isin([98, 99])]['REQUEST_ID'].drop_duplicates()
-            # 정책그룹만 자동연장 -> 연장제외 된 케이스를 예외하기 위함.
-            auto_extension_id = info_df[
-                ((info_df['REQUEST_STATUS'] == 98) & info_df['REQUEST_ID'].str.startswith('PS')) |
-                (info_df['REQUEST_STATUS'] == 99)
-            ]['REQUEST_ID'].drop_duplicates()
-
+            auto_extension_id = info_df[info_df['REQUEST_STATUS'] == 99]['REQUEST_ID'].drop_duplicates()
+            
             # 중복정책 파일 로드
             df = pd.read_excel(selected_file)
             

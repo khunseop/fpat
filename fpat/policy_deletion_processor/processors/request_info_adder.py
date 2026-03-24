@@ -45,27 +45,42 @@ class RequestInfoAdder:
             info_df (DataFrame): 정보 DataFrame
         """
         
-        rule_df['End Date'] = pd.to_datetime(rule_df['End Date']).dt.date
-        info_df['REQUEST_END_DATE'] = pd.to_datetime(info_df['REQUEST_END_DATE']).dt.date
+        # rule_df['End Date'] = pd.to_datetime(rule_df['End Date']).dt.date
+        # info_df['REQUEST_END_DATE'] = pd.to_datetime(info_df['REQUEST_END_DATE']).dt.date
+
+        rule_df['End Date'] = pd.to_datetime(rule_df['End Date']).dt.normalize()
+        info_df['REQUEST_END_DATE'] = pd.to_datetime(info_df['REQUEST_END_DATE']).dt.normalize()
 
         total = len(rule_df)
         for idx, row in rule_df.iterrows():
             print(f"\r신청 정보 매칭 중: {idx + 1}/{total}", end='', flush=True)
+            matched_row = pd.DataFrame()
+            
             if row['Request Type'] == 'GROUP':
-                matched_row = info_df[
-                    ((info_df['REQUEST_ID'] == row['Request ID']) & (info_df['MIS_ID'] == row['MIS ID'])) |
-                    ((info_df['REQUEST_ID'] == row['Request ID']) & (info_df['REQUEST_END_DATE'] == row['End Date']) & (info_df['WRITE_PERSON_ID'] == row['Request User'])) |
+                match_conditions = info_df[
+                    ((info_df['REQUEST_ID'] == row['Request ID']) & (info_df['MIS_ID'] == row['MIS ID'])),
+                    ((info_df['REQUEST_ID'] == row['Request ID']) & (info_df['REQUEST_END_DATE'] == row['End Date']) & (info_df['WRITE_PERSON_ID'] == row['Request User'])),
                     ((info_df['REQUEST_ID'] == row['Request ID']) & (info_df['REQUEST_END_DATE'] == row['End Date']) & (info_df['REQUESTER_ID'] == row['Request User']))
                 ]
             else:
-                matched_row = info_df[info_df['REQUEST_ID'] == row['Request ID']]
+                match_conditions = [
+                    (info_df['REQUEST_ID'] == row['Request ID'])
+                ]
             
+            for cond in match_conditions:
+                subnet = info_df[cond]
+                if not subset.empty:
+                    matched_row = subset.sort_index()
+                    break
+            # if not matched_row.empty:
             if not matched_row.empty:
+                first = matched_row.iloc[0]
                 for col in matched_row.columns:
                     if col in ['REQUEST_START_DATE', 'REQUEST_END_DATE', 'Start Date', 'End Date']:
-                        rule_df.at[idx, col] = pd.to_datetime(matched_row[col].values[0], errors='coerce')
+                        rule_df.at[idx, col] = pd.to_datetime(first[col], errors='coerce')
                     else:
-                        rule_df.at[idx, col] = matched_row[col].values[0]
+                        rule_df.at[idx, col] = first[col]
+
             elif row['Request Type'] != 'nan' and row['Request Type'] != 'Unknown':
                 rule_df.at[idx, 'REQUEST_ID'] = row['Request ID']
                 rule_df.at[idx, 'REQUEST_START_DATE'] = row['Start Date']
@@ -99,10 +114,14 @@ class RequestInfoAdder:
 
         # filtered_df = info_df[info_df['REQUEST_STATUS'].isin([98, 99])]['REQUEST_ID'].drop_duplicates()
         # 정책그룹만 자동연장 -> 연장제외 된 케이스를 예외하기 위함.
-        filtered_df = info_df[
-            ((info_df['REQUEST_STATUS'] == 98) & info_df['REQUEST_ID'].str.startswith('PS')) |
-            (info_df['REQUEST_STATUS'] == 99)
-        ]['REQUEST_ID'].drop_duplicates()
+        # filtered_df = info_df[
+        #     ((info_df['REQUEST_STATUS'] == 98) & info_df['REQUEST_ID'].str.startswith('PS')) |
+        #     (info_df['REQUEST_STATUS'] == 99)
+        # ]['REQUEST_ID'].drop_duplicates()
+        
+        # 다시 실제로 자동연장인것만 예외처리. 날짜기반으로 검증 필요
+        filtered_df = info_df[info_df['REQUEST_STATUS'] == 99]['REQUEST_ID'].drop_duplicates()
+
         logger.info(f"자동 연장 ID {len(filtered_df)}개를 찾았습니다.")
         return filtered_df
     

@@ -575,7 +575,7 @@ class PaloAltoAPI:
                     "Original Packet Destination Interface": destination_interface,
                     "Original Packet Source Address": source,
                     "Original Packet Destination Address": destination,
-                    "Service": service,
+                    "Original Packet Service": service,
                     "Translated Packet Source Translation": source_translation,
                     "Translated Packet Destination Translation": destination_translation,
                     "Description": description,

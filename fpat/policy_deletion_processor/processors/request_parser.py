@@ -80,9 +80,17 @@ class RequestParser:
 
         if gsams3_match:
             # 매칭된 데이터를 딕셔너리로 저장
+
+            # 정책그룹에서 버전정보 일단 제거하기
+            # 정규식으로 지우면 MIS ID가 식별이 안됨
+            request_id = gsams3_match.group(5)
+            if "v" in request_id:
+                texts = request_id.split('-')
+                request_id = texts[0] + '-' + texts[1]
+
             data_dict = {
                 "Request Type": None,
-                "Request ID": gsams3_match.group(5),
+                "Request ID": request_id,
                 "Ruleset ID": gsams3_match.group(1),
                 "MIS ID": gsams3_match.group(6) if gsams3_match.group(6) else None,  # MIS ID가 없으면 None 할당
                 "Request User": gsams3_match.group(4),
@@ -95,7 +103,7 @@ class RequestParser:
             if type_code == "P":
                 data_dict["Request Type"] = "GROUP"
             elif type_code == "F":
-                data_dict["Request Type"] = "NORMAL"
+                data_dict["Request Type"] = "GENERAL"
             elif type_code == "S":
                 data_dict["Request Type"] = "SERVER"
             elif type_code == "M":
