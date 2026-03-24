@@ -178,8 +178,10 @@ class SSHChecker:
             
             self.is_connected = False
             
-        except Exception:
-            pass  # 연결 종료 시 오류 무시
+        except Exception as e:
+            import logging
+            logging.warning(f"SSH 연결 종료 중 오류 발생: {str(e)}")
+            pass  # 연결 종료 시 오류는 로그만 남기고 무시
     
     def __del__(self):
         """객체 소멸자 - 연결 정리"""

@@ -104,7 +104,9 @@ class ReportGenerator:
                     try:
                         if len(str(row.value)) > max_length:
                             max_length = len(str(row.value))
-                    except:
+                    except Exception as e:
+                        import logging
+                        logging.debug(f"Row value parsing skipped: {e}")
                         pass
                 
                 adjusted_width = min(max_length + 2, 50)  # 최대 50자로 제한
@@ -121,6 +123,8 @@ class ReportGenerator:
             }
             
         except Exception as e:
+            import logging
+            logging.error(f"Excel 리포트 생성 중 예외 발생: {str(e)}")
             return {
                 'success': False,
                 'message': f'Excel 리포트 생성 실패: {str(e)}'
@@ -132,6 +136,7 @@ class ReportGenerator:
         """오래된 리포트 파일 정리"""
         try:
             import time
+            import logging
             
             current_time = time.time()
             cutoff_time = current_time - (days_old * 24 * 60 * 60)
@@ -143,5 +148,7 @@ class ReportGenerator:
                     if file_time < cutoff_time:
                         os.remove(filepath)
                         
-        except Exception:
+        except Exception as e:
+            import logging
+            logging.warning(f"오래된 리포트 정리 중 오류 발생: {str(e)}")
             pass  # 정리 실패는 무시

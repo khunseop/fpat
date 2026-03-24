@@ -3,6 +3,7 @@ import logging
 import requests
 import pandas as pd
 from contextlib import contextmanager
+from fpat.firewall_module.exceptions import FirewallAuthenticationError, FirewallAPIError
 
 # SSL 경고 비활성화
 requests.packages.urllib3.disable_warnings()
@@ -73,10 +74,12 @@ class NGFClient:
                 return self.token
             else:
                 logging.error("Login Failed, status code: %s", response.status_code)
-                return None
+                raise FirewallAuthenticationError(f"NGF 로그인 실패 (Status: {response.status_code})")
         except Exception as e:
+            if isinstance(e, FirewallAuthenticationError):
+                raise
             logging.error("Exception during login: %s", e)
-            return None
+            raise FirewallAuthenticationError(f"NGF 로그인 중 예외 발생: {str(e)}")
 
     def logout(self) -> bool:
         """NGF에서 로그아웃"""
@@ -119,10 +122,12 @@ class NGFClient:
                 return response.json()
             else:
                 logging.error("GET %s Failed, status code: %s", endpoint, response.status_code)
-                return None
+                raise FirewallAPIError(f"NGF API 호출 실패 ({endpoint}, Status: {response.status_code})")
         except Exception as e:
+            if isinstance(e, FirewallAPIError):
+                raise
             logging.error("Exception during GET %s: %s", endpoint, e)
-            return None
+            raise FirewallAPIError(f"NGF API 예외 발생 ({endpoint}): {str(e)}")
 
     def get_system_device(self) -> dict:
         """
@@ -163,10 +168,12 @@ class NGFClient:
                 return response.json()
             else:
                 logging.error("GET %s Failed, status code: %s", endpoint, response.status_code)
-                return None
+                raise FirewallAPIError(f"NGF API 호출 실패 ({endpoint}, Status: {response.status_code})")
         except Exception as e:
+            if isinstance(e, FirewallAPIError):
+                raise
             logging.error("Exception during GET %s: %s", endpoint, e)
-            return None
+            raise FirewallAPIError(f"NGF API 예외 발생 ({endpoint}): {str(e)}")
 
     def get_fw4_rules(self) -> dict:
         """
