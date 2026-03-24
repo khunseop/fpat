@@ -64,12 +64,13 @@ class RequestParser:
         if pd.isnull(description):
             return data_dict
 
-        # 패턴 정의 (MIS ID가 optional)
-        pattern_gsams_3 = re.compile(r"마스킹")
-        pattern_gsams_1_rulename = re.compile(r'마스킹')
-        pattern_gsams_1_user = r'마스킹'
-        gsams_1_rulename = r"마스킹"
-        gsams_1_date = r'마스킹'
+        # 패턴 로드 (설정 파일 참조)
+        conf_prefix = 'policy_processing.request_parsing'
+        pattern_gsams_3 = re.compile(self.config.get(f'{conf_prefix}.gsams_3_pattern', r"마스킹"))
+        pattern_gsams_1_rulename = re.compile(self.config.get(f'{conf_prefix}.gsams_1_rulename_pattern', r'마스킹'))
+        pattern_gsams_1_user = self.config.get(f'{conf_prefix}.gsams_1_user_pattern', r'마스킹')
+        gsams_1_rulename = self.config.get(f'{conf_prefix}.gsams_1_desc_pattern', r"마스킹")
+        gsams_1_date = self.config.get(f'{conf_prefix}.gsams_1_date_pattern', r'마스킹')
 
         # 데이터 구조 검사 및 매칭 데이터 추출
         gsams3_match = pattern_gsams_3.match(description)

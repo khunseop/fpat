@@ -8,6 +8,7 @@
 import os
 import re
 import logging
+from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -22,22 +23,20 @@ class FileManager:
             config_manager: 설정 관리자
         """
         self.config = config_manager
-    
+        self._forced_files: List[str] = [] # CLI 등에서 미리 지정된 파일 리스트
+
+    def set_forced_files(self, files: List[str]):
+        """대화형 선택을 건너뛰고 반환할 파일 리스트를 설정합니다."""
+        self._forced_files = files
+
     def update_version(self, filename, final_version=False):
         """
         파일 이름의 버전을 업데이트합니다.
-        
-        Args:
-            filename (str): 파일 이름
-            final_version (bool): 최종 버전 여부
-            
-        Returns:
-            str: 업데이트된 파일 이름
         """
         base_name, ext = filename.rsplit('.', 1)
         
-        version_format = self.config.get('file_naming.policy_version_format', '_v{version}')
-        final_suffix = self.config.get('file_naming.final_version_suffix', '_vf')
+        version_format = self.config.get('file_management.policy_version_format', '_v{version}')
+        final_suffix = self.config.get('file_management.final_version_suffix', '_vf')
         
         match = re.search(r'_v(\d+)$', base_name)
         final_match = re.search(r'_vf$', base_name)
@@ -65,15 +64,17 @@ class FileManager:
     def select_files(self, extension=None):
         """
         지정된 확장자의 파일 목록에서 파일을 선택합니다.
-        
-        Args:
-            extension (str): 파일 확장자
-            
-        Returns:
-            str: 선택된 파일 이름 또는 None
+        CLI 모드에서 파일이 강제 지정된 경우 해당 파일을 우선 반환합니다.
         """
+        # 1. 강제 지정된 파일이 있는 경우 순차적으로 반환
+        if self._forced_files:
+            selected = self._forced_files.pop(0)
+            logger.info(f"강제 지정된 파일 선택: {selected}")
+            return selected
+
+        # 2. 대화형 선택 (기존 로직)
         if extension is None:
-            extension = self.config.get('file_extensions.excel', '.xlsx')
+            extension = self.config.get('file_management.default_extension', '.xlsx')
             
         file_list = [file for file in os.listdir() if file.endswith(extension)]
         if not file_list:
@@ -84,26 +85,22 @@ class FileManager:
             print(f"{i}. {file}")
         
         while True:
-            choice = input("파일 번호를 입력하세요 (종료: 0): ")
-            if choice.isdigit():
-                choice = int(choice)
-                if choice == 0:
-                    print('프로그램을 종료합니다.')
-                    return None
-                elif 1 <= choice <= len(file_list):
-                    selected_file = file_list[choice - 1]
-                    logger.info(f"파일 '{selected_file}'을 선택했습니다.")
-                    return selected_file
-            print('유효하지 않은 번호입니다. 다시 시도하세요.')
+            try:
+                choice = input("파일 번호를 입력하세요 (종료: 0): ")
+                if choice.isdigit():
+                    choice = int(choice)
+                    if choice == 0:
+                        print('프로그램을 종료합니다.')
+                        return None
+                    elif 1 <= choice <= len(file_list):
+                        selected_file = file_list[choice - 1]
+                        logger.info(f"파일 '{selected_file}'을 선택했습니다.")
+                        return selected_file
+                print('유효하지 않은 번호입니다. 다시 시도하세요.')
+            except (KeyboardInterrupt, EOFError):
+                print('\n입력이 취소되었습니다.')
+                return None
     
     def remove_extension(self, filename):
-        """
-        파일 이름에서 확장자를 제거합니다.
-        
-        Args:
-            filename (str): 파일 이름
-            
-        Returns:
-            str: 확장자가 제거된 파일 이름
-        """
-        return os.path.splitext(filename)[0] 
+        """파일 이름에서 확장자를 제거합니다."""
+        return os.path.splitext(filename)[0]

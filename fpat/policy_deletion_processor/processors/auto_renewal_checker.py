@@ -31,11 +31,14 @@ class AutoRenewalChecker:
         Returns:
             bool: 성공 여부
         """
+        # 설정에서 패턴 로드
+        bracket_pattern = self.config.get('policy_processing.aggregation.title_bracket_pattern', r'^\[([^\[\]]{1,8})\]')
+
         def remove_bracket_prefix(text):
             if isinstance(text, str) and text.startswith('['):
-                # 반복적으로 앞에서 괄호 안 문자열이 8자 이하일 때만 제거
+                # 반복적으로 앞에서 괄호 안 문자열이 조건에 맞을 때만 제거
                     while True:
-                        match = re.match(r'^\[([^\[\]]{1,8})\]', text)
+                        match = re.match(bracket_pattern, text)
                         if match:
                             text = text[len(match.group(0)):] # 괄호 포함된 부분 제거
                         else:

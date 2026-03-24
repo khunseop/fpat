@@ -1,0 +1,74 @@
+# FPAT 통합 설정 파일 (YAML)
+
+# 1. 파일 관리 및 명명 규칙
+file_management:
+  policy_version_format: "_v{version}"
+  final_version_suffix: "_vf"
+  request_id_prefix: "request_id_"
+  default_extension: ".xlsx"
+
+# 2. 분석 기준 설정
+analysis_criteria:
+  recent_policy_days: 90 # 신규 정책으로 간주할 기간
+  unused_threshold_days: 90 # 미사용 정책 판단 기준일
+
+# 3. 삭제 프로세스 예외 설정 (핵심)
+# 각 항목은 id/pattern, reason(사유), until(유효기간, 선택)을 가질 수 있습니다.
+exceptions:
+  # 신청번호(Request ID) 기반 예외
+  request_ids:
+    - id: "PS-2024-0001"
+      reason: "차세대 프로젝트 핵심 정책 (임시 유지)"
+      until: "2025-12-31" # 이 날짜가 지나면 자동으로 예외에서 제외됨
+    - id: "INFRA-MGMT"
+      reason: "인프라 관리용 영구 예외"
+
+  # 정책 이름(Rule Name) 패턴 기반 예외 (정규식 지원)
+  policy_rules:
+    - pattern: "^MGMT_.*"
+      reason: "관리 도구용 정책"
+    - pattern: ".*_BKP$"
+      reason: "백업 세션용 한시적 허용"
+      until: "2025-06-30"
+
+  # 기타 고정 예외 리스트 (기존 호환용)
+  static_list:
+    - "VPN_ACCESS"
+    - "MONITORING"
+
+# 4. 정책 가공 및 분석 상세 설정 (고도화)
+policy_processing:
+  # 신청 정보 파싱을 위한 정규식 패턴 (RequestParser)
+  # 주의: 각 패턴은 코드에서 기대하는 캡처 그룹 순서를 유지해야 합니다.
+  request_parsing:
+    gsams_3_pattern: "마스킹" # group(1):Ruleset, (2):Start, (3):End, (4):User, (5):ReqID, (6):MIS
+    gsams_1_rulename_pattern: "마스킹"
+    gsams_1_user_pattern: "마스킹"
+    gsams_1_desc_pattern: "마스킹"
+    gsams_1_date_pattern: "마스킹"
+
+  # 예외 및 인프라 정책 식별 마커 (ExceptionHandler)
+  analysis_markers:
+    paloalto:
+      deny_standard_rule_name: "마스킹"
+      infrastructure_prefixes: ["X", "X-"]
+      infrastructure_exception_label: "인프라정책"
+      special_policy_label: "XX정책"
+    secui:
+      deny_standard_description_keyword: "마스킹"
+      infrastructure_exception_label: "인프라정책"
+
+  # 데이터 취합 및 이메일 도메인 설정 (ApplicationAggregator)
+  aggregation:
+    column_mapping:
+      "마스킹": "마스킹"
+    final_columns: 
+      - "마스킹"
+    email_domain_map:
+      "마스킹2.com": "마스킹.com"
+    title_bracket_pattern: "^\\[([^\\[\\]]{1,8})\\]" # 자동연장 체크 시 제목에서 제거할 괄호 패턴
+
+# 5. 엑셀 스타일 설정
+excel_styles:
+  header_fill_color: "E0E0E0"
+  history_fill_color: "CCFFFF"

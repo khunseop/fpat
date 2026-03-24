@@ -65,10 +65,15 @@ class ExceptionHandler:
             # 예외 컬럼 추가
             df["예외"] = ''
             
-            # 1. except_list와 request id 일치 시 예외 신청정책으로 표시
+            # 1. 고도화된 예외 처리 (신청번호 및 정책 이름 기반)
+            # 신청번호 기준 예외 체크
             df['REQUEST_ID'] = df['REQUEST_ID'].fillna('')
-            for id in self.except_list:
-                df.loc[df['REQUEST_ID'].str.startswith(id, na=False), '예외'] = '예외신청정책'
+            req_except_mask = df.apply(lambda row: self.config.is_excepted('request_ids', str(row['REQUEST_ID'])), axis=1)
+            df.loc[req_except_mask, '예외'] = '예외신청정책'
+            
+            # 정책 이름 패턴 기준 예외 체크
+            rule_except_mask = df.apply(lambda row: self.config.is_excepted('policy_rules', str(row['Rule Name'])), axis=1)
+            df.loc[rule_except_mask, '예외'] = '예외정책'
          
             # 2. 신규정책 표시 (최근 3개월 이내)
             df['날짜'] = df['Rule Name'].str.extract(r'(\d{8})', expand=False)
@@ -79,14 +84,21 @@ class ExceptionHandler:
             df.loc[df['REQUEST_STATUS'] == 99, '예외'] = '자동연장정책'
 
             # 4. 인프라정책 표시
-            try:
-                deny_std_rule_index = df[df['Rule Name'] == '마스킹'].index[0]
-                df.loc[df.index < deny_std_rule_index, '예외'] = '인프라정책'
-            except (IndexError, KeyError):
-                logger.warning("마스킹 찾을 수 없습니다.")
+            marker_conf = 'policy_processing.analysis_markers.paloalto'
+            deny_std_rule = self.config.get(f'{marker_conf}.deny_standard_rule_name', '마스킹')
+            infra_label = self.config.get(f'{marker_conf}.infrastructure_exception_label', '인프라정책')
             
-            # 5. "X" 또는 "X"로 시작하는 정책인 경우
-            df.loc[df['Rule Name'].str.startswith(('X', 'X-', 'X', 'X-', 'X', 'X', 'X')), '예외'] = 'XX정책' # 마스킹 처리했으므로 수정필요
+            try:
+                deny_std_rule_index = df[df['Rule Name'] == deny_std_rule].index[0]
+                df.loc[df.index < deny_std_rule_index, '예외'] = infra_label
+            except (IndexError, KeyError):
+                logger.warning(f"기준 정책({deny_std_rule})을 찾을 수 없습니다.")
+            
+            # 5. 특수 접두사 기반 정책 표시
+            infra_prefixes = tuple(self.config.get(f'{marker_conf}.infrastructure_prefixes', []))
+            special_label = self.config.get(f'{marker_conf}.special_policy_label', 'XX정책')
+            if infra_prefixes:
+                df.loc[df['Rule Name'].str.startswith(infra_prefixes), '예외'] = special_label
 
             # 6. 비활성화정책 표시
             df.loc[df['Enable'] == 'N', '예외'] = '비활성화정책'
@@ -165,21 +177,30 @@ class ExceptionHandler:
             # 예외 컬럼 추가
             df["예외"] = ''
             
-            # 1. except_list와 request id 일치 시 예외 신청정책으로 표시
-            df['REQUEST_ID'] = df['REQUEST_ID'].fillna('-')
+            # 1. 고도화된 예외 처리 (신청번호 및 정책 이름 기반)
+            # 신청번호 기준 예외 체크
+            df['REQUEST_ID'] = df['REQUEST_ID'].fillna('')
+            req_except_mask = df.apply(lambda row: self.config.is_excepted('request_ids', str(row['REQUEST_ID'])), axis=1)
+            df.loc[req_except_mask, '예외'] = '예외신청정책'
             
-            for id in self.except_list:
-                df.loc[df['REQUEST_ID'].str.startswith(id, na=False), '예외'] = '예외신청정책'
+            # 정책 이름(Description 또는 Rule Name) 기준 예외 체크 (시큐아이는 Rule Name이 ID인 경우가 많으므로 Name 컬럼 확인)
+            name_col = 'Rule Name' if 'Rule Name' in df.columns else 'Description'
+            rule_except_mask = df.apply(lambda row: self.config.is_excepted('policy_rules', str(row[name_col])), axis=1)
+            df.loc[rule_except_mask, '예외'] = '예외정책'
             
             # 2. 자동연장정책 표시
             df.loc[df['REQUEST_STATUS'] == 99, '예외'] = '자동연장정책'
             
             # 3. 인프라정책 표시
+            marker_conf = 'policy_processing.analysis_markers.secui'
+            deny_keyword = self.config.get(f'{marker_conf}.deny_standard_description_keyword', '마스킹')
+            infra_label = self.config.get(f'{marker_conf}.infrastructure_exception_label', '인프라정책')
+
             try:
-                deny_std_rule_index = df[df['Description'].str.contains('마스킹', na=False)].index[0]
-                df.loc[df.index < deny_std_rule_index, '예외'] = '인프라정책'
+                deny_std_rule_index = df[df['Description'].str.contains(deny_keyword, na=False)].index[0]
+                df.loc[df.index < deny_std_rule_index, '예외'] = infra_label
             except (IndexError, KeyError):
-                logger.warning("마스킹 찾을 수 없습니다.")
+                logger.warning(f"기준 정책 키워드({deny_keyword})를 찾을 수 없습니다.")
 
             # 4. 현재 날짜와 3달 전 날짜 사이의 날짜에 해당하는 행인 경우
             df['Start Date'] = pd.to_datetime(df['Start Date'], errors='coerce')

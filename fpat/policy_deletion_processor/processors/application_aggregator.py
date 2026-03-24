@@ -49,15 +49,11 @@ class ApplicationAggregator:
         all_sheets = xls.sheet_names  # 모든 시트 이름 가져오기
         logging.info(f"시트 목록: {all_sheets}")
 
-        # 최종 컬럼 정보 정의 (최종 컬럼을 미리 정의)
-        final_columns = [
-            '마스킹'
-            ]
-
-        # 컬럼명 매핑 규칙 정의 (각 시트에서 사용되는 컬럼명을 최종 컬럼명에 맞게 매핑)
-        column_mapping = {
-            '마스킹': '마스킹'
-        }
+        # 최종 컬럼 및 매핑 정보 로드 (설정 파일 참조)
+        agg_conf = 'policy_processing.aggregation'
+        final_columns = self.config.get(f'{agg_conf}.final_columns', ['마스킹'])
+        column_mapping = self.config.get(f'{agg_conf}.column_mapping', {'마스킹': '마스킹'})
+        domain_map = self.config.get(f'{agg_conf}.email_domain_map', {"마스킹2.com": "마스킹.com"})
 
         # 시트 데이터 저장 리스트
         processed_sheets = []
@@ -90,18 +86,25 @@ class ApplicationAggregator:
             # 최종 컬럼에 맞춰서 데이터를 재정렬하고 부족한 컬럼은 공백으로 채움
             df = df.reindex(columns=final_columns, fill_value="")  # 공백으로 채우기
 
-            # 이메일 생성 로직 추가
+            # 이메일 생성 로직 추가 (설정 파일의 domain_map 참조)
             df['WRITE_PERSON_EMAIL'] = df.apply(
                 lambda row: f"{row['WRITE_PERSON_ID']}@{row['REQUESTER_EMAIL'].split('@')[1]}" 
-                if row['WRITE_PERSON_EMAIL'] == "" and pd.notna(row['WRITE_PERSON_ID']) else row['WRITE_PERSON_EMAIL'], 
+                if row.get('WRITE_PERSON_EMAIL') == "" and pd.notna(row.get('WRITE_PERSON_ID')) else row.get('WRITE_PERSON_EMAIL', ''), 
                 axis=1
             )
 
-            df['APPROVAL_PERSON_EMAIL'] = df.apply(
-                lambda row: f"{row['APPROVAL_PERSON_ID']}@{'마스킹.com' if row['REQUESTER_EMAIL'].split('@')[1] == '마스킹2.com' else row['REQUESTER_EMAIL'].split('@')[1]}" 
-                if row['APPROVAL_PERSON_EMAIL'] == "" and pd.notna(row['APPROVAL_PERSON_ID']) else row['APPROVAL_PERSON_EMAIL'], 
-                axis=1
-            )
+            def map_approval_email(row):
+                if not row.get('REQUESTER_EMAIL') or '@' not in row['REQUESTER_EMAIL']:
+                    return row.get('APPROVAL_PERSON_EMAIL', '')
+                
+                domain = row['REQUESTER_EMAIL'].split('@')[1]
+                target_domain = domain_map.get(domain, domain)
+                
+                if row.get('APPROVAL_PERSON_EMAIL') == "" and pd.notna(row.get('APPROVAL_PERSON_ID')):
+                    return f"{row['APPROVAL_PERSON_ID']}@{target_domain}"
+                return row.get('APPROVAL_PERSON_EMAIL', '')
+
+            df['APPROVAL_PERSON_EMAIL'] = df.apply(map_approval_email, axis=1)
 
             # 날짜 포맷 수정 ('REQUEST_START_DATE', 'REQUEST_END_DATE' 컬럼)
             for date_column in ['REQUEST_START_DATE', 'REQUEST_END_DATE']:
