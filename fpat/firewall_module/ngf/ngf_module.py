@@ -241,10 +241,19 @@ class NGFClient:
     def list_to_string(list_data) -> str:
         """
         리스트 데이터를 콤마로 구분된 문자열로 변환합니다.
+        멤버 값 자체에 콤마(,)가 포함된 경우 따옴표("")로 감싸서 구분합니다.
         """
-        if isinstance(list_data, list):
-            return ','.join(str(s) for s in list_data)
-        return list_data
+        if not isinstance(list_data, list):
+            return str(list_data)
+            
+        processed_list = []
+        for item in list_data:
+            s_item = str(item)
+            if ',' in s_item:
+                processed_list.append(f'"{s_item}"')
+            else:
+                processed_list.append(s_item)
+        return ','.join(processed_list)
 
     def export_security_rules(self) -> pd.DataFrame:
         """

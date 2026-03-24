@@ -71,6 +71,24 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # ────────────── HELPER FUNCTIONS ──────────────
 
+def list_to_string(list_data) -> str:
+    """
+    리스트 데이터를 콤마로 구분된 문자열로 변환합니다.
+    멤버 값 자체에 콤마(,)가 포함된 경우 따옴표("")로 감싸서 구분합니다.
+    """
+    if not isinstance(list_data, list):
+        return str(list_data)
+        
+    processed_list = []
+    for item in list_data:
+        s_item = str(item)
+        if ',' in s_item:
+            processed_list.append(f'"{s_item}"')
+        else:
+            processed_list.append(s_item)
+    return ','.join(processed_list)
+
+
 def create_ssh_client(host: str, port: int, username: str, password: str) -> paramiko.SSHClient:
     """
     SSHClient를 생성하고 연결한 후 반환합니다.
@@ -375,7 +393,7 @@ def parse_object(input_str: str) -> str:
             parsed.append(parts[1])
     else:
         parsed.append(cleaned)
-    return ','.join(parsed)
+    return list_to_string(parsed)
 
 
 def group_parsing(raw_content: str) -> pd.DataFrame:
@@ -553,7 +571,7 @@ def replace_values(ids: str, mapping: dict) -> str:
     """
     콤마로 구분된 id 문자열을 mapping 사전을 통해 값으로 치환하여 반환합니다.
     """
-    return ','.join(mapping.get(item.strip(), '') for item in ids.split(','))
+    return list_to_string([mapping.get(item.strip(), '') for item in ids.split(',')])
 
 
 def combine_group_objects(row: pd.Series) -> str:
@@ -561,7 +579,7 @@ def combine_group_objects(row: pd.Series) -> str:
     그룹 객체에서 변환된 hosts와 networks 값을 결합합니다.
     """
     values = [row.get('convert_hosts', ''), row.get('convert_networks', '')]
-    return ','.join(val for val in values if val and val.strip())
+    return list_to_string([val for val in values if val and val.strip()])
 
 
 def export_address_objects(group_content: str, host_content: str, network_content: str) -> tuple:
