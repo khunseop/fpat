@@ -17,13 +17,13 @@ class NGFClient:
     NGF API와 연동하여 로그인, 데이터 조회, 규칙 파싱 등의 기능을 제공하는 클라이언트입니다.
     """
 
-    def __init__(self, hostname: str, username: str, password: str, timeout: int = 60):
+    def __init__(self, hostname: str, username: str, password: str, timeout: int = 60, user_agent: str = None):
         self.hostname = hostname
         self.ext_clnt_id = username
         self.ext_clnt_secret = password
         self.timeout = timeout
         self.token = None
-        self.user_agent = (
+        self.user_agent = user_agent or (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/54.0.2840.99 Safari/537.6"
@@ -66,7 +66,7 @@ class NGFClient:
                 headers=self._get_headers(),
                 data=json.dumps(data),
                 verify=False,
-                timeout=3
+                timeout=self.timeout
             )
             if response.status_code == 200:
                 logging.info("Login Success")
@@ -92,7 +92,7 @@ class NGFClient:
                 url,
                 headers=self._get_headers(token=self.token),
                 verify=False,
-                timeout=3
+                timeout=self.timeout
             )
             if response.status_code == 200:
                 logging.info("Logout Success")

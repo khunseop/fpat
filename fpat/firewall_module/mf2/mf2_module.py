@@ -193,6 +193,50 @@ def download_object_files(host: str, port: int, username: str, password: str,
         return downloaded_files
 
 
+def get_rule_file_content(host: str, port: int, username: str, password: str, remote_directory: str) -> str:
+    """
+    원격 장비에서 최신 fwrules 파일 내용을 메모리로 읽어와 문자열로 반환합니다.
+    """
+    content = ""
+    ssh = create_ssh_client(host, port, username, password)
+    try:
+        _, stdout, _ = exec_remote_command(ssh, POLICY_DIRECTORY, remote_directory)
+        fwrules_lines = stdout.readlines()
+        if fwrules_lines:
+            latest_file = fwrules_lines[0].split()[-1]
+            _, stdout2, _ = exec_remote_command(ssh, f"cat {latest_file}", remote_directory)
+            content = stdout2.read().decode('utf-8-sig', errors='ignore')
+    except Exception as e:
+        logging.error("get_rule_file_content error: %s", e)
+    finally:
+        ssh.close()
+        return content
+
+
+def get_object_files_content(host: str, port: int, username: str, password: str,
+                             remote_directory: str, conf_types: list = None) -> dict:
+    """
+    원격 장비에서 지정된 conf 파일들의 내용을 메모리로 읽어와 딕셔너리로 반환합니다.
+    """
+    if conf_types is None:
+        conf_types = ['groupobject.conf', 'hostobject.conf', 'networkobject.conf', 'serviceobject.conf']
+    
+    contents = {}
+    ssh = create_ssh_client(host, port, username, password)
+    try:
+        _, stdout, _ = exec_remote_command(ssh, CONF_DIRECTORY, remote_directory)
+        conf_lines = stdout.readlines()
+        for line in conf_lines:
+            conf_file = line.strip()
+            if conf_file in conf_types:
+                _, stdout2, _ = exec_remote_command(ssh, f"cat {conf_file}", remote_directory)
+                contents[conf_file] = stdout2.read().decode('utf-8-sig', errors='ignore')
+    except Exception as e:
+        logging.error("get_object_files_content error: %s", e)
+    finally:
+        ssh.close()
+        return contents
+
 def show_system_info(host: str, username: str, password: str) -> pd.DataFrame:
     """
     원격 장비의 시스템 정보를 수집하여 DataFrame으로 반환합니다.
@@ -334,11 +378,11 @@ def parse_object(input_str: str) -> str:
     return ','.join(parsed)
 
 
-def group_parsing(file_path: str) -> pd.DataFrame:
+def group_parsing(raw_content: str) -> pd.DataFrame:
     """
-    그룹 객체 파일을 파싱하여 DataFrame으로 반환합니다.
+    그룹 객체 내용을 파싱하여 DataFrame으로 반환합니다.
     """
-    content = remove_newlines_from_file(file_path)
+    content = raw_content.replace('\n', '')
     depth_braces = extract_braces_of_depth_2_or_more_without_outer_braces(content)
     if depth_braces:
         depth_braces.pop(0)  # id 정보 삭제
@@ -372,11 +416,11 @@ def group_parsing(file_path: str) -> pd.DataFrame:
     return pd.DataFrame(data_list)
 
 
-def service_parsing(file_path: str) -> pd.DataFrame:
+def service_parsing(raw_content: str) -> pd.DataFrame:
     """
-    서비스 객체 파일을 파싱하여 DataFrame으로 반환합니다.
+    서비스 객체 내용을 파싱하여 DataFrame으로 반환합니다.
     """
-    content = remove_newlines_from_file(file_path)
+    content = raw_content.replace('\n', '')
     depth_braces = extract_braces_of_depth_2_or_more_without_outer_braces(content)
     if depth_braces:
         # 첫 두 항목(id 등) 삭제
@@ -395,12 +439,12 @@ def service_parsing(file_path: str) -> pd.DataFrame:
     return pd.DataFrame(data_list)
 
 
-def network_parsing(file_path: str) -> pd.DataFrame:
+def network_parsing(raw_content: str) -> pd.DataFrame:
     """
-    네트워크 객체 파일을 파싱하여 DataFrame으로 반환합니다.
+    네트워크 객체 내용을 파싱하여 DataFrame으로 반환합니다.
     range 문자열 포함 여부에 따라 RANGE_PATTERN 또는 MASK_PATTERN을 사용합니다.
     """
-    content = remove_newlines_from_file(file_path)
+    content = raw_content.replace('\n', '')
     depth_braces = extract_braces_of_depth_2_or_more_without_outer_braces(content)
     if depth_braces:
         depth_braces.pop(0)
@@ -416,11 +460,11 @@ def network_parsing(file_path: str) -> pd.DataFrame:
     return pd.DataFrame(data_list)
 
 
-def host_parsing(file_path: str) -> pd.DataFrame:
+def host_parsing(raw_content: str) -> pd.DataFrame:
     """
-    호스트 객체 파일을 파싱하여 DataFrame으로 반환합니다.
+    호스트 객체 내용을 파싱하여 DataFrame으로 반환합니다.
     """
-    content = remove_newlines_from_file(file_path)
+    content = raw_content.replace('\n', '')
     depth_braces = extract_braces_of_depth_2_or_more_without_outer_braces(content)
     if depth_braces:
         depth_braces.pop(0)
@@ -435,11 +479,11 @@ def host_parsing(file_path: str) -> pd.DataFrame:
     return pd.DataFrame(data_list)
 
 
-def rule_parsing(file_path: str) -> pd.DataFrame:
+def rule_parsing(raw_content: str) -> pd.DataFrame:
     """
-    규칙(rule) 파일을 파싱하여 DataFrame으로 반환합니다.
+    규칙(rule) 내용을 파싱하여 DataFrame으로 반환합니다.
     """
-    content = remove_newlines_from_file(file_path)
+    content = raw_content.replace('\n', '')
     depth_braces = extract_braces_of_depth_2_or_more_without_outer_braces(content)
     if not depth_braces:
         return pd.DataFrame()
@@ -520,14 +564,14 @@ def combine_group_objects(row: pd.Series) -> str:
     return ','.join(val for val in values if val and val.strip())
 
 
-def export_address_objects(group_file: str, host_file: str, network_file: str) -> tuple:
+def export_address_objects(group_content: str, host_content: str, network_content: str) -> tuple:
     """
-    그룹, 호스트, 네트워크 객체 파일을 파싱하여
+    그룹, 호스트, 네트워크 객체 내용을 파싱하여
     네트워크 객체(DataFrame)와 그룹 객체(DataFrame)를 반환합니다.
     """
-    group_df = group_parsing(group_file)
-    network_df = network_parsing(network_file)
-    host_df = host_parsing(host_file)
+    group_df = group_parsing(group_content)
+    network_df = network_parsing(network_content)
+    host_df = host_parsing(host_content)
 
     if not network_df.empty:
         network_df['Value'] = network_df.apply(combine_mask_end, axis=1)
@@ -550,11 +594,11 @@ def export_address_objects(group_file: str, host_file: str, network_file: str) -
     return network_objects_df, group_df
 
 
-def export_service_objects(service_file: str) -> pd.DataFrame:
+def export_service_objects(service_content: str) -> pd.DataFrame:
     """
-    서비스 객체 파일을 파싱하여 DataFrame으로 반환합니다.
+    서비스 객체 내용을 파싱하여 DataFrame으로 반환합니다.
     """
-    service_df = service_parsing(service_file)
+    service_df = service_parsing(service_content)
     if not service_df.empty:
         service_df = service_df[['name', 'protocol', 'str_svc_port']]
         service_df.columns = ['Name', 'Protocol', 'Port']
@@ -563,30 +607,33 @@ def export_service_objects(service_file: str) -> pd.DataFrame:
 
 def export_objects(device_ip: str, username: str, password: str) -> list:
     """
-    원격 장비에서 객체 파일(conf)들을 다운로드하여 그룹/호스트/네트워크, 서비스 DataFrame을 생성한 후,
-    다운로드된 파일들은 삭제하고 DataFrame 리스트를 반환합니다.
+    원격 장비에서 객체 파일(conf)들을 메모리로 읽어와 그룹/호스트/네트워크, 서비스 DataFrame을 생성한 후 반환합니다.
     """
-    files = download_object_files(device_ip, 22, username, password, '/secui/etc/', './')
-    if len(files) < 4:
-        logging.error("필요한 conf 파일이 모두 다운로드되지 않았습니다.")
+    contents = get_object_files_content(device_ip, 22, username, password, '/secui/etc/')
+    if len(contents) < 4:
+        logging.error("필요한 conf 파일 내용을 모두 가져오지 못했습니다.")
         return []
-    group_file, host_file, network_file, service_file = files[:4]
-    address_df, address_group_df = export_address_objects(group_file, host_file, network_file)
-    service_df = export_service_objects(service_file)
-    delete_files(files)
+        
+    group_content = contents.get('groupobject.conf', '')
+    host_content = contents.get('hostobject.conf', '')
+    network_content = contents.get('networkobject.conf', '')
+    service_content = contents.get('serviceobject.conf', '')
+    
+    address_df, address_group_df = export_address_objects(group_content, host_content, network_content)
+    service_df = export_service_objects(service_content)
+    
     return [address_df, address_group_df, service_df]
 
 
 def export_security_rules(device_ip: str, username: str, password: str) -> pd.DataFrame:
     """
-    원격 장비에서 규칙 파일(fwrules)을 다운로드하여 파싱한 후 DataFrame으로 반환합니다.
+    원격 장비에서 규칙 파일(fwrules) 내용을 읽어와 파싱한 후 DataFrame으로 반환합니다.
     """
-    file_name = download_rule_file(device_ip, 22, username, password, '/secui/etc/', './')
-    if not file_name:
-        logging.error("규칙 파일 다운로드 실패")
+    content = get_rule_file_content(device_ip, 22, username, password, '/secui/etc/')
+    if not content:
+        logging.error("규칙 내용 다운로드 실패")
         return pd.DataFrame()
-    rule_df = rule_parsing(file_name)
-    delete_files(file_name)
+    rule_df = rule_parsing(content)
     return rule_df
 
 

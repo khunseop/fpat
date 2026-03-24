@@ -19,11 +19,11 @@
 ## 📂 우선순위: 중 (기능 완성도 및 구조 개선)
 
 ### 1. 방화벽 모듈(Vendor) 고도화
-- [ ] **`MF2Collector`**:
-    - [ ] `export_usage_logs()`, `export_service_group_objects()` 메서드의 실제 구현 검토 (지원 가능 여부 재확인).
-    - [ ] 로컬 `temp/` 파일 다운로드 방식에서 메모리/스트림 기반 파싱으로 전환하여 성능 및 안정성 향상.
-- [ ] **`NGFCollector`**: `get_system_info()` 연동 및 데이터 파싱 로직 완성.
-- [ ] **하드코딩 제거**: `NGFClient`의 로그인 타임아웃(3s), `User-Agent` 등을 설정값(config)으로 관리하도록 분리.
+- [x] **`MF2Collector`**:
+    - [x] `export_usage_logs()`, `export_service_group_objects()` 메서드의 실제 구현 검토 및 미지원 경고 로깅 추가 완료.
+    - [x] 로컬 `temp/` 파일 다운로드 방식에서 메모리/스트림 기반 파싱으로 전환 완료.
+- [ ] **`NGFCollector`**: `get_system_info()` 연동. (현재 타 벤더도 미지원 상태이므로 추후 공통 스펙 확정 시 진행)
+- [x] **하드코딩 제거**: `NGFClient`의 로그인 타임아웃(3s), `User-Agent` 등을 설정값(config)으로 관리하도록 분리 완료.
 
 ### 2. 아키텍처 리팩토링
 - [ ] **`FirewallCollectorFactory`**: `username/password` 외에 `client_id/secret` 등 벤더별 다양한 인증 파라미터를 유연하게 수용할 수 있도록 매개변수 구조 개선 (`**kwargs` 등 활용).
