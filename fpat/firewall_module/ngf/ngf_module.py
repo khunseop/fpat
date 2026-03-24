@@ -151,7 +151,7 @@ class NGFClient:
 
         url = f"https://{self.hostname}{endpoint}"
         try:
-            response = request.get(
+            response = requests.get(
                 url,
                 headers=self._get_headers(token=self.token),
                 verify=False,
@@ -526,7 +526,6 @@ class NGFClient:
         def _get_data():
 
             data = self.get_system_device()
-            print(data)
 
             results = data.get("result", [])
             if not results:

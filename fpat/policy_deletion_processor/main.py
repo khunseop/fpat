@@ -159,14 +159,14 @@ def main():
             result = policy_usage_processor.update_excepted_usage(file_manager)
         elif task == 13:
             # 정리대상 별 공지파일 분류하기
-            cnotification_classifier = NotificationClassifier(config_manager)
+            notification_classifier = NotificationClassifier(config_manager)
             result = notification_classifier.classify_notifications(file_manager, excel_manager)
         elif task == 14:
             # 자동연장확인
             auto_renewal_checker = AutoRenewalChecker(config_manager)
             result = auto_renewal_checker.renewal_check(file_manager)
 
-        if reulst:
+        if result:
             print("작업이 성공적으로 완료되었습니다.")
         else:
             print("작업이 실패했습니다.")

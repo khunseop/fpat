@@ -57,7 +57,7 @@ class RequestInfoAdder:
             matched_row = pd.DataFrame()
             
             if row['Request Type'] == 'GROUP':
-                match_conditions = info_df[
+                match_conditions = [
                     ((info_df['REQUEST_ID'] == row['Request ID']) & (info_df['MIS_ID'] == row['MIS ID'])),
                     ((info_df['REQUEST_ID'] == row['Request ID']) & (info_df['REQUEST_END_DATE'] == row['End Date']) & (info_df['WRITE_PERSON_ID'] == row['Request User'])),
                     ((info_df['REQUEST_ID'] == row['Request ID']) & (info_df['REQUEST_END_DATE'] == row['End Date']) & (info_df['REQUESTER_ID'] == row['Request User']))
@@ -68,7 +68,7 @@ class RequestInfoAdder:
                 ]
             
             for cond in match_conditions:
-                subnet = info_df[cond]
+                subset = info_df[cond]
                 if not subset.empty:
                     matched_row = subset.sort_index()
                     break

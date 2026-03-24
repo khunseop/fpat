@@ -44,7 +44,7 @@ class AutoRenewalChecker:
         
         try:
             print("가공된 신청정보 파일을 선택하세요.")
-            file_name = file_manger.select_files()
+            file_name = file_manager.select_files()
             if not file_name:
                 return False
             
@@ -78,5 +78,5 @@ class AutoRenewalChecker:
 
             return True
         except Exception as e:
-            logger.exception as e:
+            logger.exception(e)
             return False

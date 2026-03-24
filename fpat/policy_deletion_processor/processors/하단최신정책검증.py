@@ -16,7 +16,7 @@ def find_seq_mismatches(df: pd.DataFrame) -> pd.DataFrame:
         컬럼: REQUEST_ID, lowest_seq, latest_seq(list)
     """
 
-    df df.copy()
+    df = df.copy()
     df["REQUEST_START_DATE"] = pd.to_datetime(df["REQUEST_START_DATE"], errors="coerce")
 
     results = []
