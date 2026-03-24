@@ -115,11 +115,19 @@ class PaloAltoAPI:
     def list_to_string(list_data: list) -> str:
         """
         리스트 데이터를 콤마 구분 문자열로 변환합니다.
+        멤버 값 자체에 콤마(,)가 포함된 경우 따옴표("")로 감싸서 구분합니다.
 
         :param list_data: 리스트 데이터
         :return: 콤마로 구분된 문자열
         """
-        return ','.join(str(item) for item in list_data)
+        processed_list = []
+        for item in list_data:
+            s_item = str(item)
+            if ',' in s_item:
+                processed_list.append(f'"{s_item}"')
+            else:
+                processed_list.append(s_item)
+        return ','.join(processed_list)
 
     def get_api_data(self, parameters, timeout: int = 10000):
         """API 호출을 수행합니다."""
