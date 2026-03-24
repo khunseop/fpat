@@ -290,16 +290,37 @@ from fpat.policy_deletion_processor.processors import policy_usage_processor
 from fpat.policy_deletion_processor.utils import excel_manager
 ```
 
-## 📚 모듈 구조
+## 🏗️ 프로젝트 구조 및 워크플로우
 
-```
-fpat/
-├── policy_comparator/          # 정책 비교 기능
-├── firewall_module/            # 방화벽 연동 기능
-├── firewall_analyzer/         # 정책 분석 기능
-├── policy_deletion_processor/ # 삭제 시나리오 처리
-└── paloalto_parameter_checker/ # Palo Alto 파라미터 체크 도구
-```
+FPAT은 데이터 수집부터 분석, 처리에 이르는 전체 정책 관리 라이프사이클을 지원합니다.
+
+### 1. 데이터 수집 (`firewall_module`)
+- 다양한 벤더(PaloAlto, SECUI NGF/MF2)로부터 정책 및 객체 데이터를 추출합니다.
+- API 또는 CLI를 통해 엑셀 형태로 정형화된 데이터를 생성합니다.
+
+### 2. 정책 분석 (`firewall_analyzer`)
+- 수집된 데이터를 바탕으로 중복(Redundancy), Shadow 정책을 분석합니다.
+- 강력한 IP/CIDR 필터링 기능을 통해 특정 네트워크 대역의 영향도를 파악합니다.
+
+### 3. 변경 관리 (`policy_comparator`)
+- 이전 정책과 현재 정책을 비교하여 변경 이력을 관리하고 감사 리포트를 생성합니다.
+
+### 4. 정책 정리 (`policy_deletion_processor`)
+- 미사용 정책이나 중복 정책을 실제 삭제하기 위한 워크플로우를 처리합니다.
+- 신청 정보(MIS ID) 매칭, 자동 연장 확인 등 실무 프로세스를 지원합니다.
+
+### 5. 설정 감사 (`paloalto_parameter_checker`)
+- 방화벽 자체의 보안 설정(Parameter)이 가이드라인을 준수하는지 점검합니다.
+
+## 📂 상세 모듈 안내
+
+| 모듈명 | 설명 | 상세 문서 |
+| :--- | :--- | :--- |
+| **firewall_module** | 방화벽 데이터 수집 (PaloAlto, NGF, MF2) | [Link](fpat/firewall_module/README.md) |
+| **firewall_analyzer** | 정책 중복/Shadow 분석 및 IP 필터링 | [Link](fpat/firewall_analyzer/README.md) |
+| **policy_comparator** | 시점 간 정책/객체 변경 사항 비교 | [Link](fpat/policy_comparator/README.md) |
+| **policy_deletion_processor** | 정책 삭제 영향도 분석 및 처리 프로세스 | [Link](fpat/policy_deletion_processor/README.md) |
+| **paloalto_parameter_checker** | PaloAlto 보안 설정 자동 점검 도구 | [Link](fpat/paloalto_parameter_checker/README.md) |
 
 ## 🔧 지원 방화벽
 
