@@ -6,5 +6,7 @@ from .policy_analyzer import PolicyAnalyzer
 from .redundancy_analyzer import RedundancyAnalyzer
 from .change_analyzer import ChangeAnalyzer
 from .policy_resolver import PolicyResolver
+from .shadow_analyzer import ShadowAnalyzer
+from .policy_filter import PolicyFilter
 
-__all__ = ['PolicyAnalyzer', 'RedundancyAnalyzer', 'ChangeAnalyzer', 'PolicyResolver'] 
+__all__ = ['PolicyAnalyzer', 'RedundancyAnalyzer', 'ChangeAnalyzer', 'PolicyResolver', 'ShadowAnalyzer', 'PolicyFilter']
