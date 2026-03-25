@@ -9,23 +9,28 @@ import logging
 import pandas as pd
 import os
 
+from .base_processor import BaseProcessor
+
 logger = logging.getLogger(__name__)
 
-class NotificationClassifier:
+class NotificationClassifier(BaseProcessor):
     """정리대상별 공지파일 분류 기능을 제공하는 클래스"""
     
     def __init__(self, config_manager):
-        """
-        공지파일 분류기를 초기화합니다.
-        
-        Args:
-            config_manager: 설정 관리자
-        """
-        self.config = config_manager
+        super().__init__(config_manager)
         self.columns = self.config.get('columns.all', [])
         self.columns_no_history = self.config.get('columns.no_history', [])
         self.date_columns = self.config.get('columns.date_columns', [])
         self.translated_columns = self.config.get('translated_columns', {})
+
+    def run(self, file_manager, **kwargs):
+        """정리대상별 공지파일을 분류합니다. (excel_manager 인자 필요)"""
+        excel_manager = kwargs.get('excel_manager')
+        if not excel_manager:
+            # 기본적으로 ExcelManager 인스턴스를 하나 만들어서 시도할 수도 있지만 안전하게 체크
+            logger.error("NotificationClassifier는 excel_manager 인자가 필요합니다.")
+            return False
+        return self.classify_notifications(file_manager, excel_manager)
     
     def _save_to_excel(self, df, sheet_type, file_name, excel_manager):
         """
@@ -99,12 +104,6 @@ class NotificationClassifier:
     def _expired_used(self, df, selected_file, file_manager, excel_manager):
         """
         만료된 사용 정책을 분류합니다.
-        
-        Args:
-            df: 정책 DataFrame
-            selected_file: 선택된 파일 이름
-            file_manager: 파일 관리자
-            excel_manager: Excel 관리자
         """
         # 만료된 사용 정책 필터링
         filtered_df = df[
@@ -146,12 +145,6 @@ class NotificationClassifier:
     def _expired_unused(self, df, selected_file, file_manager, excel_manager):
         """
         만료된 미사용 정책을 분류합니다.
-        
-        Args:
-            df: 정책 DataFrame
-            selected_file: 선택된 파일 이름
-            file_manager: 파일 관리자
-            excel_manager: Excel 관리자
         """
         # 만료된 미사용 정책 필터링
         filtered_df = df[
@@ -193,12 +186,6 @@ class NotificationClassifier:
     def _longterm_unused_rules(self, df, selected_file, file_manager, excel_manager):
         """
         장기 미사용 정책을 분류합니다.
-        
-        Args:
-            df: 정책 DataFrame
-            selected_file: 선택된 파일 이름
-            file_manager: 파일 관리자
-            excel_manager: Excel 관리자
         """
         # 장기 미사용 정책 필터링
         filtered_df = df[
@@ -240,12 +227,6 @@ class NotificationClassifier:
     def _no_history_unused(self, df, selected_file, file_manager, excel_manager):
         """
         이력 없는 미사용 정책을 분류합니다.
-        
-        Args:
-            df: 정책 DataFrame
-            selected_file: 선택된 파일 이름
-            file_manager: 파일 관리자
-            excel_manager: Excel 관리자
         """
         # 이력 없는 미사용 정책 필터링
         filtered_df = df[
@@ -273,4 +254,4 @@ class NotificationClassifier:
         
         self._save_to_excel(selected_df, sheet_type, filename, excel_manager)
         logger.info(f"이력 없는 미사용 정책을 '{filename}'에 저장했습니다.")
-        print(f"이력 없는 미사용 정책이 '{filename}'에 저장되었습니다.") 
+        print(f"이력 없는 미사용 정책이 '{filename}'에 저장되었습니다.")

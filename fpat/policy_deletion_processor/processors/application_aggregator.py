@@ -8,20 +8,16 @@ GSAMS에서 전달받은 신청 정보를 취합하는 모듈
 import logging
 import pandas as pd
 
+from .base_processor import BaseProcessor
+
 logger = logging.getLogger(__name__)
 
-class ApplicationAggregator:
+class ApplicationAggregator(BaseProcessor):
     """신청 정보를 취합하는 클래스"""
     
-    def __init__(self, config_manager):
-        """
-        모듈을 초기화합니다.
-        
-        Args:
-            config_manager: 설정 관리자
-        """
-        self.config = config_manager
-
+    def run(self, file_manager, **kwargs):
+        """신청 정보를 수집합니다."""
+        return self.collect_applications(file_manager)
     
     def format_date(self, date):
         """

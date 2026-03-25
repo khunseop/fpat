@@ -8,19 +8,16 @@
 import logging
 import pandas as pd
 
+from .base_processor import BaseProcessor
+
 logger = logging.getLogger(__name__)
 
-class RequestInfoAdder:
+class RequestInfoAdder(BaseProcessor):
     """신청 정보 추가 기능을 제공하는 클래스"""
     
-    def __init__(self, config_manager):
-        """
-        신청 정보 추가기를 초기화합니다.
-        
-        Args:
-            config_manager: 설정 관리자
-        """
-        self.config = config_manager
+    def run(self, file_manager, **kwargs):
+        """파일에 신청 정보를 추가합니다."""
+        return self.add_request_info(file_manager)
     
     def read_and_process_excel(self, file):
         """

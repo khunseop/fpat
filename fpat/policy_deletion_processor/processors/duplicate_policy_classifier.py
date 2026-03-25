@@ -9,19 +9,19 @@ import logging
 import pandas as pd
 import os
 
+from .base_processor import BaseProcessor
+
 logger = logging.getLogger(__name__)
 
-class DuplicatePolicyClassifier:
+class DuplicatePolicyClassifier(BaseProcessor):
     """중복정책 분류 기능을 제공하는 클래스"""
     
-    def __init__(self, config_manager):
-        """
-        중복정책 분류기를 초기화합니다.
-        
-        Args:
-            config_manager: 설정 관리자
-        """
-        self.config = config_manager
+    def run(self, file_manager, **kwargs):
+        """중복정책 분류 또는 상태 업데이트를 수행합니다. (mode 인자 필요)"""
+        mode = kwargs.get('mode', 'classify')
+        if mode == 'classify':
+            return self.organize_redundant_file(file_manager)
+        return self.add_duplicate_status(file_manager)
     
     def organize_redundant_file(self, file_manager):
         """

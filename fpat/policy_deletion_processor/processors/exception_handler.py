@@ -9,20 +9,19 @@ import logging
 import pandas as pd
 from datetime import datetime, timedelta
 
+from .base_processor import BaseProcessor
+
 logger = logging.getLogger(__name__)
 
-class ExceptionHandler:
+class ExceptionHandler(BaseProcessor):
     """방화벽 정책 예외처리 기능을 제공하는 클래스"""
     
-    def __init__(self, config_manager):
-        """
-        예외처리 핸들러를 초기화합니다.
-        
-        Args:
-            config_manager: 설정 관리자
-        """
-        self.config = config_manager
-        self.except_list = self.config.get('except_list', [])
+    def run(self, file_manager, **kwargs):
+        """예외처리를 수행합니다. (vendor 인자 필요)"""
+        vendor = kwargs.get('vendor', 'paloalto')
+        if vendor == 'paloalto':
+            return self.paloalto_exception(file_manager)
+        return self.secui_exception(file_manager)
     
     def _check_date(self, row):
         """

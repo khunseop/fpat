@@ -27,7 +27,7 @@
 
 ### 2. 아키텍처 리팩토링
 - [ ] **`FirewallCollectorFactory`**: `username/password` 외에 `client_id/secret` 등 벤더별 다양한 인증 파라미터를 유연하게 수용할 수 있도록 매개변수 구조 개선 (`**kwargs` 등 활용).
-- [ ] **`policy_deletion_processor`**: 평면적인 `processors/` 구조를 파이프라인(Pipeline) 또는 플러그인 패턴으로 정형화하여 확장성 확보.
+- [x] **`policy_deletion_processor`**: 평면적인 `processors/` 구조를 파이프라인(Pipeline) 패턴으로 정형화하여 확장성 확보 완료. (BaseProcessor 및 Pipeline 엔진 도입)
 
 ---
 

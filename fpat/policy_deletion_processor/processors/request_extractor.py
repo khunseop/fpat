@@ -8,19 +8,16 @@
 import logging
 import pandas as pd
 
+from .base_processor import BaseProcessor
+
 logger = logging.getLogger(__name__)
 
-class RequestExtractor:
+class RequestExtractor(BaseProcessor):
     """신청 ID 추출 기능을 제공하는 클래스"""
     
-    def __init__(self, config_manager):
-        """
-        신청 ID 추출기를 초기화합니다.
-        
-        Args:
-            config_manager: 설정 관리자
-        """
-        self.config = config_manager
+    def run(self, file_manager, **kwargs):
+        """파일에서 신청 ID를 추출합니다."""
+        return self.extract_request_id(file_manager)
     
     def extract_request_id(self, file_manager):
         """

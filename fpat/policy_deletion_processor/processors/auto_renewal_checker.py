@@ -9,18 +9,16 @@ import logging
 import pandas as pd
 import re
 
+from .base_processor import BaseProcessor
+
 logger = logging.getLogger(__name__)
 
-class AutoRenewalChecker:
-
-    def __init__(self, config_manager):
-        """
-        Merge 모듈을 초기화합니다.
-
-        Args:
-            config_manager: 설정 관리자
-        """
-        self.config =config_manager
+class AutoRenewalChecker(BaseProcessor):
+    """신청 정보에서 자동 연장 데이터를 확인하는 클래스"""
+    
+    def run(self, file_manager, **kwargs):
+        """자동연장 점검을 수행합니다."""
+        return self.renewal_check(file_manager)
     
     def renewal_check(self, file_manager):
         """

@@ -5,6 +5,7 @@
 방화벽 정책 관리 프로세스의 데이터 처리 모듈 패키지
 """
 
+from .base_processor import BaseProcessor
 from .request_parser import RequestParser
 from .request_extractor import RequestExtractor  
 from .mis_id_adder import MisIdAdder
@@ -15,8 +16,10 @@ from .duplicate_policy_classifier import DuplicatePolicyClassifier
 from .merge_hitcount import MergeHitcount
 from .policy_usage_processor import PolicyUsageProcessor
 from .notification_classifier import NotificationClassifier
+from .auto_renewal_checker import AutoRenewalChecker
 
 __all__ = [
+    'BaseProcessor',
     'RequestParser',
     'RequestExtractor',
     'MisIdAdder', 
@@ -26,5 +29,6 @@ __all__ = [
     'DuplicatePolicyClassifier',
     'MergeHitcount',
     'PolicyUsageProcessor',
-    'NotificationClassifier'
+    'NotificationClassifier',
+    'AutoRenewalChecker'
 ]

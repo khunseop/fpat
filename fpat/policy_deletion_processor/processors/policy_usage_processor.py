@@ -8,19 +8,19 @@
 import logging
 import pandas as pd
 
+from .base_processor import BaseProcessor
+
 logger = logging.getLogger(__name__)
 
-class PolicyUsageProcessor:
+class PolicyUsageProcessor(BaseProcessor):
     """미사용 정책 처리 기능을 제공하는 클래스"""
     
-    def __init__(self, config_manager):
-        """
-        미사용 정책 처리기를 초기화합니다.
-        
-        Args:
-            config_manager: 설정 관리자
-        """
-        self.config = config_manager
+    def run(self, file_manager, **kwargs):
+        """미사용 정책 상태를 추가하거나 예외 정보를 업데이트합니다. (mode 인자 필요)"""
+        mode = kwargs.get('mode', 'add')
+        if mode == 'add':
+            return self.add_usage_status(file_manager)
+        return self.update_excepted_usage(file_manager)
     
     def add_usage_status(self, file_manager):
         """

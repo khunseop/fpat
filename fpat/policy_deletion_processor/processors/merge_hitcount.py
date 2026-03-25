@@ -8,20 +8,17 @@ FPAT으로 추출된 Hit 정보 2개를 Merge하는 모듈
 import logging
 import pandas as pd
 
+from .base_processor import BaseProcessor
+
 logger = logging.getLogger(__name__)
 
-class MergeHitcount:
+class MergeHitcount(BaseProcessor):
     """FPAT으로 추출된 Hit 정보 2개를 Merge하는 클래스"""
     
-    def __init__(self, config_manager):
-        """
-        Merge 모듈을 초기화합니다.
-        
-        Args:
-            config_manager: 설정 관리자
-        """
-        self.config = config_manager
-
+    def run(self, file_manager, **kwargs):
+        """Hit 정보 2개를 Merge합니다."""
+        return self.mergehitcounts(file_manager)
+    
     def mergehitcounts(self, file_manager):
         """
         Hit 정보 2개를 Merge합니다.

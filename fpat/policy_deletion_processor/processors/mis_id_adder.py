@@ -8,19 +8,16 @@ MIS ID 추가 기능을 제공하는 모듈
 import logging
 import pandas as pd
 
+from .base_processor import BaseProcessor
+
 logger = logging.getLogger(__name__)
 
-class MisIdAdder:
+class MisIdAdder(BaseProcessor):
     """MIS ID 추가 기능을 제공하는 클래스"""
     
-    def __init__(self, config_manager):
-        """
-        MIS ID 추가기를 초기화합니다.
-        
-        Args:
-            config_manager: 설정 관리자
-        """
-        self.config = config_manager
+    def run(self, file_manager, **kwargs):
+        """파일에 MIS ID를 추가합니다."""
+        return self.add_mis_id(file_manager)
     
     def add_mis_id(self, file_manager):
         """
