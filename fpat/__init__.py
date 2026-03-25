@@ -13,4 +13,6 @@ from . import firewall_module
 from . import firewall_analyzer
 from . import policy_deletion_processor
 
-__all__ = ['policy_comparator', 'firewall_module', 'firewall_analyzer', 'policy_deletion_processor'] 
+from .policy_deletion_processor.core.config_manager import ConfigManager
+
+__all__ = ['policy_comparator', 'firewall_module', 'firewall_analyzer', 'policy_deletion_processor', 'ConfigManager'] 
