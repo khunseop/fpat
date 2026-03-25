@@ -43,21 +43,60 @@ class FirewallAnalyzerCLI:
             return False
 
         logger.info(f"데이터 로드 중: {input_file}")
-        df = pd.read_excel(input_file)
+        
+        # 1. 엑셀 파일의 모든 시트 로드 시도
+        try:
+            xls = pd.ExcelFile(input_file)
+            sheet_names = xls.sheet_names
+            
+            # 정책 데이터 로드 (기본은 첫 번째 시트 또는 'policy' 시트)
+            policy_sheet = 'policy' if 'policy' in sheet_names else sheet_names[0]
+            df = pd.read_excel(xls, sheet_name=policy_sheet)
+            
+            # 2. 객체 정보 시트 존재 여부 확인 및 리졸빙 시도
+            has_objects = all(s in sheet_names for s in ['address', 'service'])
+            
+            if has_objects:
+                logger.info("객체 정보 시트를 발견했습니다. 정밀 분석을 위한 데이터 해소를 시작합니다...")
+                from fpat.firewall_analyzer.core.policy_resolver import PolicyResolver
+                
+                address_df = pd.read_excel(xls, sheet_name='address')
+                service_df = pd.read_excel(xls, sheet_name='service')
+                addr_group_df = pd.read_excel(xls, sheet_name='address_group') if 'address_group' in sheet_names else pd.DataFrame(columns=['Group Name', 'Entry'])
+                svc_group_df = pd.read_excel(xls, sheet_name='service_group') if 'service_group' in sheet_names else pd.DataFrame(columns=['Group Name', 'Entry'])
+                
+                resolver = PolicyResolver()
+                df = resolver.resolve(df, address_df, addr_group_df, service_df, svc_group_df)
+                logger.info("객체 데이터 해소 완료.")
+            else:
+                logger.warning("객체 정보 시트가 부족하여 기본 텍스트 기반 분석을 수행합니다.")
+
+        except Exception as e:
+            logger.error(f"파일 로드 중 오류 발생: {e}")
+            return False
         
         result_df = pd.DataFrame()
         
+        # 3. 분석 수행 (데이터가 해소된 경우 analyze_logical 우선 사용)
         if analysis_type == 'redundancy':
             logger.info("중복 정책 분석 시작...")
-            result_df = self.redundancy_analyzer.analyze(df, vendor=vendor)
+            if 'Extracted Source' in df.columns:
+                result_df = self.redundancy_analyzer.analyze_logical(df, vendor=vendor)
+            else:
+                result_df = self.redundancy_analyzer.analyze(df, vendor=vendor)
+                
         elif analysis_type == 'shadow':
             logger.info("Shadow 정책 분석 시작...")
+            # ShadowAnalyzer도 향후 analyze_logical 지원 시 확장 가능
             result_df = self.shadow_analyzer.analyze(df, vendor=vendor)
+            
         elif analysis_type == 'all':
             logger.info("전체 분석(중복 & Shadow) 시작...")
-            red_df = self.redundancy_analyzer.analyze(df, vendor=vendor)
+            if 'Extracted Source' in df.columns:
+                red_df = self.redundancy_analyzer.analyze_logical(df, vendor=vendor)
+            else:
+                red_df = self.redundancy_analyzer.analyze(df, vendor=vendor)
             sha_df = self.shadow_analyzer.analyze(df, vendor=vendor)
-            # 결과 합치기 또는 별도 시트로 저장 로직 필요 (여기서는 단순 합치기 예시)
             result_df = pd.concat([red_df, sha_df]).drop_duplicates()
         else:
             logger.error(f"알 수 없는 분석 타입: {analysis_type}")
