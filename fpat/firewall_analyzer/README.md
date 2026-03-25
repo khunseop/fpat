@@ -29,49 +29,18 @@ firewall_analyzer/
 
 ## 🔧 사용법
 
-### 1. 중복 및 Shadow 정책 분석
+### 1. 통합 CLI (권장)
+추출된 엑셀 파일을 분석하여 중복 및 Shadow 정책 리포트를 생성합니다.
 
-```python
-from fpat.firewall_analyzer import RedundancyAnalyzer, ShadowAnalyzer
-import pandas as pd
-
-# 정책 데이터 로드
-df = pd.read_excel("policies.xlsx")
-
-# 중복 정책 분석
-red_analyzer = RedundancyAnalyzer()
-redundancy_result = red_analyzer.analyze(df, vendor="paloalto")
-
-# Shadow 정책 분석
-sha_analyzer = ShadowAnalyzer()
-shadow_result = sha_analyzer.analyze(df, vendor="paloalto")
+```bash
+# 전체 분석 (중복 & Shadow)
+python -m fpat analyze --input raw_data.xlsx --vendor paloalto --type all
 ```
 
-### 2. 상세 정책 필터링
-
-```python
-from fpat.firewall_analyzer import PolicyFilter
-
-filter_obj = PolicyFilter()
-
-# CIDR 기반 Source 주소 필터링
-filtered_df = filter_obj.filter_by_source(
-    df, 
-    search_address="192.168.1.0/24",
-    include_any=True
-)
-
-# 복합 조건 필터링 (Source AND Destination)
-both_filtered = filter_obj.filter_by_criteria(
-    df,
-    source_address="192.168.1.0/24",
-    destination_address="10.0.0.0/8",
-    match_mode="AND"
-)
-```
-
+### 2. 프로그래밍 방식 사용 (API)
+...
 ## 📋 의존성
 
 - **pandas**: 데이터 프레임 처리
-- **netaddr**: IP 주소 및 네트워크 연산
+- **ipaddress**: IP 주소 수학적 포함 관계 분석 (표준 라이브러리)
 - **openpyxl**: Excel 파일 핸들링

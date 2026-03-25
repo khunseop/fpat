@@ -21,18 +21,18 @@ paloalto_parameter_checker/
 ├── templates/          # 웹 UI 템플릿 (HTML)
 └── static/             # 정적 리소스 (JS, CSS)
 ```
-
 ## 🔧 사용법
 
-### 1. 웹 서비스 실행
+### 1. 웹 서비스 실행 (권장)
+FPAT 통합 진입점을 통해 간편하게 웹 서버를 구동할 수 있습니다.
 
 ```bash
-cd fpat/paloalto_parameter_checker
-python run.py
+python -m fpat checker --port 5000
 ```
 실행 후 브라우저에서 `http://localhost:5000` 접속
 
-### 2. 주요 점검 항목
+### 2. 개별 실행
+...
 - **Management Interface**: 접근 제어 설정, HTTPS 사용 여부
 - **Authentication**: 패스워드 복잡성, 최소 길이, 실패 시 잠금 정책
 - **Session**: 관리자 세션 타임아웃, 로그온 배너 설정

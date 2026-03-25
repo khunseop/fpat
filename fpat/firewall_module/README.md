@@ -32,7 +32,16 @@
 
 ## CLI 사용법
 
-### 기본 사용법
+### 1. 통합 CLI (권장)
+FPAT 통합 진입점을 통해 다른 모듈과 연계하여 사용할 수 있습니다.
+
+```bash
+# 전체 데이터 추출
+python -m fpat extract --vendor paloalto --hostname 1.1.1.1 --username admin --export-type all --output data.xlsx
+```
+
+### 2. 개별 모듈 CLI
+특정 벤더 전용 옵션이 필요한 경우 개별 모듈로 실행 가능합니다.
 
 ```bash
 # PaloAlto 정책 추출
@@ -42,23 +51,6 @@ python -m fpat.firewall_module.cli \
     --username admin \
     --export-type policy \
     --output ./policies.xlsx
-
-# 전체 데이터 추출 (비밀번호 프롬프트)
-python -m fpat.firewall_module.cli \
-    --vendor paloalto \
-    --hostname firewall.example.com \
-    --username admin \
-    --export-type all \
-    --output ./complete_data.xlsx
-
-# 환경 변수에서 비밀번호 읽기
-export FIREWALL_PASSWORD="your_password"
-python -m fpat.firewall_module.cli \
-    --vendor ngf \
-    --hostname 10.0.0.1 \
-    --username admin \
-    --export-type policy \
-    --output ./ngf_policies.xlsx
 ```
 
 ### CLI 옵션
