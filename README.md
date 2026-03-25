@@ -32,16 +32,18 @@ python -m fpat extract --vendor paloalto \
     --output ./data/raw_policy.xlsx
 ```
 
-### 2. 정책 삭제 프로세스 처리 (`process`)
-추출된 데이터를 바탕으로 14가지 분석 태스크를 실행합니다. `--files` 인자를 사용하여 자동화가 가능합니다.
+### 2. 정책 분석 (`analyze`)
+추출된 정책 데이터의 중복성 및 Shadow 정책(가려진 정책)을 분석하여 엑셀 리포트를 생성합니다.
 
 ```bash
-# 태스크 1: Description에서 신청번호 파싱
-python -m fpat process --task 1 --files raw_policy.xlsx
+# 중복 정책 분석
+python -m fpat analyze --input ./data/raw_policy.xlsx --vendor paloalto --type redundancy
 
-# 태스크 5: 정책 파일에 신청 정보 매칭 (복수 파일 사용)
-python -m fpat process --task 5 --files policy_v1.xlsx application_info.xlsx
+# 전체 분석 (중복 & Shadow)
+python -m fpat analyze -i ./data/raw_policy.xlsx -v paloalto -t all
 ```
+
+### 3. 정책 삭제 프로세스 처리 (`process`)
 
 ---
 
