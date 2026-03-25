@@ -13,25 +13,18 @@ analysis_criteria:
   unused_threshold_days: 90 # 미사용 정책 판단 기준일
 
 # 3. 삭제 프로세스 예외 설정 (핵심)
-# 각 항목은 id/pattern, reason(사유), until(유효기간, 선택)을 가질 수 있습니다.
 exceptions:
-  # 신청번호(Request ID) 기반 예외
   request_ids:
     - id: "PS-2024-0001"
-      reason: "차세대 프로젝트 핵심 정책 (임시 유지)"
-      until: "2025-12-31" # 이 날짜가 지나면 자동으로 예외에서 제외됨
-    - id: "INFRA-MGMT"
-      reason: "인프라 관리용 영구 예외"
-
-  # 정책 이름(Rule Name) 패턴 기반 예외 (정규식 지원)
+      reason: "차세대 프로젝트 핵심 정책"
+      until: "2025-12-31"
+  
   policy_rules:
     - pattern: "^MGMT_.*"
       reason: "관리 도구용 정책"
     - pattern: ".*_BKP$"
-      reason: "백업 세션용 한시적 허용"
-      until: "2025-06-30"
+      reason: "백업 세션용"
 
-  # 기타 고정 예외 리스트 (기존 호환용)
   static_list:
     - "VPN_ACCESS"
     - "MONITORING"
@@ -39,34 +32,40 @@ exceptions:
 # 4. 정책 가공 및 분석 상세 설정 (고도화)
 policy_processing:
   # 신청 정보 파싱을 위한 정규식 패턴 (RequestParser)
-  # 주의: 각 패턴은 코드에서 기대하는 캡처 그룹 순서를 유지해야 합니다.
+  # YAML에서는 백슬래시(\) 처리를 위해 작은따옴표('') 사용을 권장합니다.
   request_parsing:
-    gsams_3_pattern: "마스킹" # group(1):Ruleset, (2):Start, (3):End, (4):User, (5):ReqID, (6):MIS
-    gsams_1_rulename_pattern: "마스킹"
-    gsams_1_user_pattern: "마스킹"
-    gsams_1_desc_pattern: "마스킹"
-    gsams_1_date_pattern: "마스킹"
+    # 예시: r'\d{8}-(\d{1,7})-\d{1,2}' 패턴을 각 서비스에 맞게 구성
+    gsams_3_pattern: '(\d{8})-(\d{1,7})-(\d{1,2})' # 예시용 (실제 그룹 순서에 맞춰 조정 필요)
+    gsams_1_rulename_pattern: '^(\d{8}-\d{1,7}-\d{1,2})' 
+    gsams_1_user_pattern: '\[([^\]]+)\]'
+    gsams_1_desc_pattern: '신청번호: (\d{8}-\d{1,7}-\d{1,2})'
+    gsams_1_date_pattern: '(\d{8})~(\d{8})'
 
   # 예외 및 인프라 정책 식별 마커 (ExceptionHandler)
   analysis_markers:
     paloalto:
-      deny_standard_rule_name: "마스킹"
-      infrastructure_prefixes: ["X", "X-"]
+      deny_standard_rule_name: "Deny_All"
+      infrastructure_prefixes: ["X", "X-", "SYS_"]
       infrastructure_exception_label: "인프라정책"
-      special_policy_label: "XX정책"
+      special_policy_label: "특수정책"
     secui:
-      deny_standard_description_keyword: "마스킹"
+      deny_standard_description_keyword: "차단기준"
       infrastructure_exception_label: "인프라정책"
 
   # 데이터 취합 및 이메일 도메인 설정 (ApplicationAggregator)
   aggregation:
     column_mapping:
-      "마스킹": "마스킹"
+      "신청번호": "REQUEST_ID"
+      "시작일": "REQUEST_START_DATE"
+      "종료일": "REQUEST_END_DATE"
     final_columns: 
-      - "마스킹"
+      - "REQUEST_ID"
+      - "REQUEST_START_DATE"
+      - "REQUEST_END_DATE"
+      - "REQUESTER_ID"
     email_domain_map:
-      "마스킹2.com": "마스킹.com"
-    title_bracket_pattern: "^\\[([^\\[\\]]{1,8})\\]" # 자동연장 체크 시 제목에서 제거할 괄호 패턴
+      "oldcorp.com": "company.com"
+    title_bracket_pattern: '^\[([^\[\]]{1,8})\]'
 
 # 5. 엑셀 스타일 설정
 excel_styles:

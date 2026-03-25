@@ -57,23 +57,25 @@ class ConfigManager:
         if env_path:
             search_paths.append(env_path)
             
-        # 3. 현재 작업 디렉토리
+        # 3. 프로젝트 루트 및 현재 작업 디렉토리
         cwd = os.getcwd()
-        search_paths.append(os.path.join(cwd, 'fpat.yaml'))
-        search_paths.append(os.path.join(cwd, 'fpat.yml'))
-        search_paths.append(os.path.join(cwd, 'config.json'))
+        pkg_base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         
-        # 4. 패키지 기본 위치
+        for base in [cwd, pkg_base]:
+            search_paths.append(os.path.join(base, 'fpat.yaml'))
+            search_paths.append(os.path.join(base, 'fpat.yml'))
+            search_paths.append(os.path.join(base, 'config.json'))
+        
+        # 4. 패키지 내부 기본 위치
         pkg_dir = self._get_package_base_dir()
         search_paths.append(os.path.join(pkg_dir, 'fpat.yaml'))
-        search_paths.append(os.path.join(pkg_dir, 'config.json'))
 
         for path in search_paths:
             if os.path.exists(path) and os.path.isfile(path):
-                return path
+                return os.path.abspath(path)
                 
-        # 기본값 (파일이 없어도 경로만 반환하여 로드 시 에러 처리하게 함)
-        return os.path.join(cwd, 'fpat.yaml')
+        # 기본값
+        return os.path.abspath(os.path.join(cwd, 'fpat.yaml'))
 
     def _load_config(self) -> Dict[str, Any]:
         """파일 확장자에 따라 설정을 로드합니다."""
