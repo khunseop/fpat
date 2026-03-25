@@ -4,52 +4,58 @@
 
 ## 🚀 주요 기능
 
-- **통합 CLI**: `python -m fpat` 단일 명령어로 추출 및 분석 프로세스 통합 실행.
+- **통합 CLI**: `python -m fpat` 또는 `fpat.exe` 단일 명령어로 추출, 분석, 삭제 프로세스 통합 실행.
 - **다중 벤더 지원**: PaloAlto, SECUI NGF, MF2 등 다양한 방화벽 연동.
 - **현대적인 설정 관리**: 주석과 기간제 예외 처리를 지원하는 YAML 기반 설정 시스템.
 - **정책 분석**: 중복 정책, Shadow 정책 탐지 및 IP/CIDR 기반 정밀 필터링.
-- **삭제 워크플로우**: 신청 정보 매칭 및 미사용 정책 정리 프로세스 지원.
+- **보안 감사**: PaloAlto 보안 파라미터 자동 점검 웹 UI 제공.
 
-## 📦 설치
+## 📦 설치 및 빌드
 
+### 1. 라이브러리 설치
 ```bash
-# GitHub에서 직접 설치
 pip install git+https://github.com/khunseop/fpat.git
 ```
 
-## 🔧 통합 CLI 사용법
-
-FPAT은 모든 기능을 통합 CLI(`python -m fpat`)를 통해 제공합니다.
-
-### 1. 방화벽 데이터 추출 (`extract`)
-벤더사 API 또는 SSH를 통해 정책 및 객체 데이터를 엑셀로 추출합니다.
+### 2. 단일 EXE 파일 빌드
+프로젝트의 모든 기능을 포함하는 단일 실행 파일(`.exe`)을 생성할 수 있습니다.
 
 ```bash
-python -m fpat extract --vendor paloalto \
-    --hostname 192.168.1.1 \
-    --username admin \
-    --export-type all \
-    --output ./data/raw_policy.xlsx
+python build_exe.py
+```
+빌드 완료 후 `dist/fpat` (Windows의 경우 `fpat.exe`) 파일이 생성됩니다.
+
+---
+
+## 🔧 통합 CLI 사용법
+
+FPAT은 모든 기능을 통합 CLI(`python -m fpat` 또는 빌드된 `fpat.exe`)를 통해 제공합니다.
+
+### 1. 방화벽 데이터 추출 (`extract`)
+```bash
+fpat extract --vendor paloalto --hostname 1.1.1.1 --username admin --export-type all --output raw.xlsx
 ```
 
 ### 2. 정책 분석 (`analyze`)
-추출된 정책 데이터의 중복성 및 Shadow 정책(가려진 정책)을 분석하여 엑셀 리포트를 생성합니다.
-
 ```bash
-# 중복 정책 분석
-python -m fpat analyze --input ./data/raw_policy.xlsx --vendor paloalto --type redundancy
-
-# 전체 분석 (중복 & Shadow)
-python -m fpat analyze -i ./data/raw_policy.xlsx -v paloalto -t all
+fpat analyze --input raw.xlsx --vendor paloalto --type all
 ```
 
 ### 3. 정책 삭제 프로세스 처리 (`process`)
+```bash
+fpat process --task 1 2 5 --files raw.xlsx
+```
+
+### 4. 파라미터 체크 웹 UI 실행 (`checker`)
+```bash
+fpat checker --port 5000
+```
 
 ---
 
 ## ⚙️ 설정 관리 (`fpat.yaml`)
 
-FPAT은 프로젝트 루트의 `fpat.yaml` 파일을 통해 동작을 제어합니다. (환경 변수 `FPAT_CONFIG`로 경로 지정 가능)
+FPAT은 프로젝트 루트의 `fpat.yaml` 파일을 통해 동작을 제어합니다.
 
 ### 기간제 및 패턴 기반 예외 설정
 특정 날짜까지 혹은 특정 패턴의 정책을 분석 대상에서 자동으로 제외할 수 있습니다.
