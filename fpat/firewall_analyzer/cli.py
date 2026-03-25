@@ -36,7 +36,7 @@ class FirewallAnalyzerCLI:
         self.shadow_analyzer = ShadowAnalyzer()
         self.policy_filter = PolicyFilter()
 
-    def run_analysis(self, input_file, analysis_type, vendor, output_file=None):
+    def run_analysis(self, input_file, analysis_type, vendor, output_file=None, use_logical=False):
         """지정된 분석 작업을 수행합니다."""
         if not os.path.exists(input_file):
             logger.error(f"입력 파일을 찾을 수 없습니다: {input_file}")
@@ -44,7 +44,7 @@ class FirewallAnalyzerCLI:
 
         logger.info(f"데이터 로드 중: {input_file}")
         
-        # 1. 엑셀 파일의 모든 시트 로드 시도
+        # 1. 엑셀 파일 로드 및 객체 해소 (필요시)
         try:
             xls = pd.ExcelFile(input_file)
             sheet_names = xls.sheet_names
@@ -53,11 +53,11 @@ class FirewallAnalyzerCLI:
             policy_sheet = 'policy' if 'policy' in sheet_names else sheet_names[0]
             df = pd.read_excel(xls, sheet_name=policy_sheet)
             
-            # 2. 객체 정보 시트 존재 여부 확인 및 리졸빙 시도
+            # 객체 정보 시트 존재 여부 확인 및 리졸빙 시도
             has_objects = all(s in sheet_names for s in ['address', 'service'])
             
             if has_objects:
-                logger.info("객체 정보 시트를 발견했습니다. 정밀 분석을 위한 데이터 해소를 시작합니다...")
+                logger.info("객체 정보 시트를 발견했습니다. 데이터 해소를 수행합니다...")
                 from fpat.firewall_analyzer.core.policy_resolver import PolicyResolver
                 
                 address_df = pd.read_excel(xls, sheet_name='address')
@@ -68,31 +68,28 @@ class FirewallAnalyzerCLI:
                 resolver = PolicyResolver()
                 df = resolver.resolve(df, address_df, addr_group_df, service_df, svc_group_df)
                 logger.info("객체 데이터 해소 완료.")
-            else:
-                logger.warning("객체 정보 시트가 부족하여 기본 텍스트 기반 분석을 수행합니다.")
-
         except Exception as e:
             logger.error(f"파일 로드 중 오류 발생: {e}")
             return False
         
         result_df = pd.DataFrame()
         
-        # 3. 분석 수행 (데이터가 해소된 경우 analyze_logical 우선 사용)
+        # 2. 분석 수행 (고속 방식 analyze 우선 사용)
         if analysis_type == 'redundancy':
-            logger.info("중복 정책 분석 시작...")
-            if 'Extracted Source' in df.columns:
+            if use_logical and 'Extracted Source' in df.columns:
+                logger.info("중복 정책 분석 시작 (정밀 논리 분석 모드)...")
                 result_df = self.redundancy_analyzer.analyze_logical(df, vendor=vendor)
             else:
+                logger.info("중복 정책 분석 시작 (고속 모드)...")
                 result_df = self.redundancy_analyzer.analyze(df, vendor=vendor)
                 
         elif analysis_type == 'shadow':
             logger.info("Shadow 정책 분석 시작...")
-            # ShadowAnalyzer도 향후 analyze_logical 지원 시 확장 가능
             result_df = self.shadow_analyzer.analyze(df, vendor=vendor)
             
         elif analysis_type == 'all':
             logger.info("전체 분석(중복 & Shadow) 시작...")
-            if 'Extracted Source' in df.columns:
+            if use_logical and 'Extracted Source' in df.columns:
                 red_df = self.redundancy_analyzer.analyze_logical(df, vendor=vendor)
             else:
                 red_df = self.redundancy_analyzer.analyze(df, vendor=vendor)
@@ -122,6 +119,7 @@ def create_parser():
                         help='분석 유형 (redundancy: 중복, shadow: 가려짐, all: 전체)')
     parser.add_argument('--vendor', '-v', choices=['paloalto', 'ngf', 'mf2'], required=True, help='방화벽 벤더')
     parser.add_argument('--output', '-o', help='결과 저장 파일 경로 (선택 사항)')
+    parser.add_argument('--logical', action='store_true', help='수학적 포함 관계 기반 정밀 분석 사용 (속도가 느림)')
     parser.add_argument('--config', '-c', help='설정 파일 경로')
     return parser
 
@@ -134,7 +132,8 @@ def main():
         input_file=args.input,
         analysis_type=args.type,
         vendor=args.vendor,
-        output_file=args.output
+        output_file=args.output,
+        use_logical=args.logical
     )
     
     if success:
