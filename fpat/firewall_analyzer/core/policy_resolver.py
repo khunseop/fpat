@@ -64,24 +64,43 @@ class PolicyResolver:
 
         return pd.DataFrame(rows)
 
-    def resolve(self, rules_df, network_object_df, network_group_object_df, service_object_df, service_group_object_df, rule_type = 'security') -> pd.DataFrame:
+    def resolve(self, rules_df: pd.DataFrame, address_df: pd.DataFrame, addr_group_df: pd.DataFrame, 
+                service_df: pd.DataFrame, svc_group_df: pd.DataFrame, rule_type: str = 'security') -> pd.DataFrame:
+        """
+        추출된 모든 객체 정보를 바탕으로 정책 내의 이름을 실제 값으로 해소합니다.
+        
+        Args:
+            rules_df: 보안 또는 NAT 정책 DataFrame
+            address_df: 주소 객체 DataFrame (Name, Type, Value)
+            addr_group_df: 주소 그룹 DataFrame (Group Name, Entry)
+            service_df: 서비스 객체 DataFrame (Name, Protocol, Port)
+            svc_group_df: 서비스 그룹 DataFrame (Group Name, Entry)
+            rule_type: 'security' 또는 'nat'
+        """
         try:
+            # 1. 룩업 딕셔너리 준비
+            network_group_dict = addr_group_df.set_index('Group Name')['Entry'].to_dict() if not addr_group_df.empty else {}
+            network_dict = address_df.set_index('Name')['Value'].to_dict() if not address_df.empty else {}
 
-            network_group_dict = network_group_object_df.set_index('Group Name')['Entry'].to_dict()
-            network_dict = network_object_df.set_index('Name')['Value'].to_dict()
+            if svc_group_df is None or svc_group_df.empty:
+                svc_group_df = pd.DataFrame(columns=['Group Name', 'Entry'])
+            service_group_dict = svc_group_df.set_index('Group Name')['Entry'].to_dict()
 
-            if service_group_object_df is None or service_group_object_df.empty:
-                service_group_object_df = pd.DataFrame(columns=['Group Name', 'Entry'])
-
-            service_group_dict = service_group_object_df.set_index('Group Name')['Entry'].to_dict()
-            service_object_df = self.combine_protocol_port(service_object_df)
-            service_dict = service_object_df.set_index('Name')['Value'].to_dict()
+            # 서비스 객체는 Protocol/Port를 결합한 Value 컬럼이 필요함
+            if not service_df.empty and 'Value' not in service_df.columns:
+                service_df_combined = self.combine_protocol_port(service_df)
+                service_dict = service_df_combined.set_index('Name')['Value'].to_dict()
+            else:
+                service_dict = service_df.set_index('Name')['Value'].to_dict() if not service_df.empty else {}
             
+            # 2. 정책 타입별 해석 실행
             if rule_type == "security":
+                # 그룹 해소 (재귀)
                 rules_df['Resolved Source'] = rules_df['Source'].apply(lambda x: self.process_cell(x, network_group_dict))
                 rules_df['Resolved Destination'] = rules_df['Destination'].apply(lambda x: self.process_cell(x, network_group_dict))
                 rules_df['Resolved Service'] = rules_df['Service'].apply(lambda x: self.process_cell(x, service_group_dict))
 
+                # 실제 값으로 치환
                 rules_df['Extracted Source'] = rules_df['Resolved Source'].apply(lambda x: self.replace_object_to_value(x, network_dict))
                 rules_df['Extracted Destination'] = rules_df['Resolved Destination'].apply(lambda x: self.replace_object_to_value(x, network_dict))
                 rules_df['Extracted Service'] = rules_df['Resolved Service'].apply(lambda x: self.replace_object_to_value(x, service_dict))
@@ -89,20 +108,38 @@ class PolicyResolver:
                 rules_df.drop(columns=['Resolved Source', 'Resolved Destination', 'Resolved Service'], inplace=True)
 
             elif rule_type == "nat":
-                rules_df['Resolved OG Source'] = rules_df['Original Packet Source Address'].apply(lambda x: self.process_cell(x, network_group_dict))
-                rules_df['Resolved OG Destination'] = rules_df['Original Packet Destination Address'].apply(lambda x: self.process_cell(x, network_group_dict))
-                rules_df['Resolved TS Source'] = rules_df['Translated Packet Source Translation'].apply(lambda x: self.process_cell(x, network_group_dict))
-                rules_df['Resolved TS Destination'] = rules_df['Translated Packet Destination Translation'].apply(lambda x: self.process_cell(x, network_group_dict))
-                rules_df['Resolved OG Service'] = rules_df['Original Packet Service'].apply(lambda x: self.process_cell(x, service_group_dict))
-            
-                rules_df['Extracted OG Source'] = rules_df['Resolved OG Source'].apply(lambda x: self.replace_object_to_value(x, network_dict))
-                rules_df['Extracted OG Destination'] = rules_df['Resolved OG Destination'].apply(lambda x: self.replace_object_to_value(x, network_dict))
-                rules_df['Extracted TS Source'] = rules_df['Resolved TS Source'].apply(lambda x: self.replace_object_to_value(x, network_dict))
-                rules_df['Extracted TS Destination'] = rules_df['Resolved TS Destination'].apply(lambda x: self.replace_object_to_value(x, network_dict))
-                rules_df['Extracted OG Service'] = rules_df['Resolved OG Service'].apply(lambda x: self.replace_object_to_value(x, service_dict))
+                # NAT 정책 컬럼 해석
+                src_col = 'Original Packet Source Address'
+                dst_col = 'Original Packet Destination Address'
+                svc_col = 'Original Packet Service'
+                ts_src_col = 'Translated Packet Source Translation'
+                ts_dst_col = 'Translated Packet Destination Translation'
 
-                rules_df.drop(columns=['Resolved OG Source', 'Resolved OG Destination', 'Resolved TS Destination', 'Resolved TS Source', 'Resolved OG Service'], inplace=True)
+                for col, dict_map, prefix in [
+                    (src_col, network_group_dict, 'Resolved OG Source'),
+                    (dst_col, network_group_dict, 'Resolved OG Destination'),
+                    (svc_col, service_group_dict, 'Resolved OG Service'),
+                    (ts_src_col, network_group_dict, 'Resolved TS Source'),
+                    (ts_dst_col, network_group_dict, 'Resolved TS Destination')
+                ]:
+                    if col in rules_df.columns:
+                        rules_df[prefix] = rules_df[col].apply(lambda x: self.process_cell(x, dict_map))
+
+                # 값 치환
+                val_maps = [
+                    ('Resolved OG Source', network_dict, 'Extracted OG Source'),
+                    ('Resolved OG Destination', network_dict, 'Extracted OG Destination'),
+                    ('Resolved OG Service', service_dict, 'Extracted OG Service'),
+                    ('Resolved TS Source', network_dict, 'Extracted TS Source'),
+                    ('Resolved TS Destination', network_dict, 'Extracted TS Destination')
+                ]
+
+                for res_col, v_map, ext_col in val_maps:
+                    if res_col in rules_df.columns:
+                        rules_df[ext_col] = rules_df[res_col].apply(lambda x: self.replace_object_to_value(x, v_map))
+                        rules_df.drop(columns=[res_col], inplace=True)
             
             return rules_df
         except Exception as e:
-            return f"데이터 처리 중 오류 발생: {e}"
+            self.logger.error(f"데이터 처리 중 오류 발생: {e}")
+            return pd.DataFrame()
