@@ -1,10 +1,19 @@
 # firewall/paloalto/paloalto_collector.py
 import pandas as pd
-from typing import Optional
+import re
+import datetime
+import time
+import paramiko
+import logging
+from typing import Optional, Union
 from ..firewall_interface import FirewallInterface
 from .paloalto_module import PaloAltoAPI
 
-from ..exceptions import FirewallConnectionError
+from ..exceptions import (
+    FirewallConnectionError, 
+    FirewallAuthenticationError, 
+    FirewallAPIError
+)
 
 
 class PaloAltoCollector(FirewallInterface):
@@ -83,9 +92,6 @@ class PaloAltoCollector(FirewallInterface):
         # 모든 vsys의 데이터를 하나로 합침
         result_df = pd.concat(hit_counts, ignore_index=True)
         
-        # 필요한 컬럼만 선택
-        # result_df = result_df[['Rule Name', 'Last Hit Date', 'Unused Days']]
-        
         # 미사용여부 컬럼 추가
         def determine_usage_status(unused_days):
             if pd.isna(unused_days):
@@ -97,3 +103,128 @@ class PaloAltoCollector(FirewallInterface):
         result_df['미사용여부'] = result_df['Unused Days'].apply(determine_usage_status)
         
         return result_df
+
+    def export_last_hit_date_ssh(self, vsys: Union[list, set, None] = None) -> pd.DataFrame:
+        """
+        SSH를 통해 각 규칙의 최근 히트 일자 정보를 수집합니다.
+        API 타임아웃 버그 대응용이며, 대용량 정책의 경우 수 시간이 소요될 수 있습니다.
+        """
+        target_vsys_list = ['vsys1']
+        if vsys:
+            target_vsys_list = [str(v) for v in vsys]
+
+        self.logger.info(f"SSH를 통한 히트카운트 수집 시작 (Target vsys: {target_vsys_list})")
+        all_results = []
+
+        ssh = None
+        try:
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            
+            # 장시간 연결을 위한 Keep-alive 설정
+            ssh.connect(
+                self.hostname, 
+                port=22, 
+                username=self.username, 
+                password=self._password, 
+                timeout=30, 
+                look_for_keys=False, 
+                allow_agent=False
+            )
+            
+            transport = ssh.get_transport()
+            if transport:
+                transport.set_keepalive(60)
+
+            channel = ssh.invoke_shell()
+            
+            def send_and_wait(command: str, wait_timeout: int = 15):
+                channel.send(command + "\n")
+                output = ""
+                start_time = time.time()
+                while time.time() - start_time < wait_timeout:
+                    if channel.recv_ready():
+                        chunk = channel.recv(4096).decode('utf-8', errors='ignore')
+                        output += chunk
+                        if output.strip().endswith(('>', '#')):
+                            return output
+                    time.sleep(0.5)
+                return output
+
+            # CLI 설정
+            send_and_wait("", 10) # 초기 배너 대기
+            send_and_wait("set cli scripting-mode on")
+            send_and_wait("set cli pager off")
+
+            for vsys_name in target_vsys_list:
+                command = f"show rule-hit-count vsys vsys-name {vsys_name} rule-base security rules all"
+                self.logger.info(f"명령어 실행 ({vsys_name}): {command}")
+                channel.send(command + "\n")
+
+                line_buffer = ""
+                parsing_started = False
+                rule_count = 0
+                vsys_start_time = time.time()
+
+                while True:
+                    if channel.recv_ready():
+                        chunk = channel.recv(8192).decode('utf-8', errors='ignore')
+                        line_buffer += chunk
+                        
+                        while "\n" in line_buffer:
+                            line, line_buffer = line_buffer.split("\n", 1)
+                            line = line.strip()
+                            
+                            if not line: continue
+                            if '----------' in line:
+                                parsing_started = True
+                                continue
+                            if not parsing_started: continue
+                            if line.startswith('intrazone-default'):
+                                parsing_started = False
+                                break
+
+                            # 룰 이름, 히트수, 타임스탬프 파싱
+                            match = re.match(r'^([a-zA-Z0-9/._-]+)\s+(\d+)\s+([A-Za-z]{3}\s+[A-Za-z]{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\d{4}|-)', line)
+                            if match:
+                                rule_name = match.group(1)
+                                timestamp_str = match.group(3).strip()
+
+                                last_hit_date = None
+                                if timestamp_str != '-':
+                                    try:
+                                        norm_ts = re.sub(r'\s+', ' ', timestamp_str)
+                                        dt_obj = datetime.datetime.strptime(norm_ts, '%a %b %d %H:%M:%S %Y')
+                                        last_hit_date = dt_obj.strftime('%Y-%m-%d %H:%M:%S')
+                                    except:
+                                        pass
+
+                                all_results.append({
+                                    "Vsys": vsys_name,
+                                    "Rule Name": rule_name,
+                                    "Last Hit Date": last_hit_date
+                                })
+                                rule_count += 1
+                                
+                                if rule_count % 100 == 0:
+                                    self.logger.info(f"[{vsys_name}] {rule_count}개 규칙 처리 중...")
+
+                        # 프롬프트 확인 시 vsys 종료
+                        if line_buffer.strip().endswith(('>', '#')):
+                            break
+                    
+                    if time.time() - vsys_start_time > 14400: # 4시간 타임아웃
+                        self.logger.error(f"{vsys_name} 처리 시간 초과")
+                        break
+                    
+                    time.sleep(0.01)
+
+        except Exception as e:
+            self.logger.error(f"SSH 수집 실패: {e}", exc_info=True)
+            raise FirewallAPIError(f"SSH 기반 히트카운트 수집 중 오류: {e}")
+        finally:
+            if ssh:
+                ssh.close()
+                self.logger.info("SSH 연결 종료")
+
+        return pd.DataFrame(all_results)
