@@ -166,6 +166,12 @@ def create_parser():
         help='비밀번호를 읽을 환경 변수 이름 (기본값: FIREWALL_PASSWORD)'
     )
     
+    parser.add_argument(
+        '--use-ssh',
+        action='store_true',
+        help='히트카운트 추출 시 SSH 방식 사용 (PaloAlto 전용, API 타임아웃 방지)'
+    )
+    
     return parser
 
 
@@ -221,7 +227,8 @@ def main():
             output_path=args.output,
             config_type=args.config_type if args.vendor == 'paloalto' else 'running',
             chunk_size=args.chunk_size,
-            progress_callback=None  # CLI에서는 로거가 진행률을 표시
+            progress_callback=None,  # CLI에서는 로거가 진행률을 표시
+            use_ssh=args.use_ssh
         )
         
         logger.info("=" * 60)

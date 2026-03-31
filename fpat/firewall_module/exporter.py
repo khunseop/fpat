@@ -26,7 +26,8 @@ def export_policy_to_excel(
     output_path: str,
     config_type: str = "running",
     chunk_size: int = 1000,
-    progress_callback: Optional[callable] = None
+    progress_callback: Optional[callable] = None,
+    use_ssh: bool = False
 ) -> str:
     """
     방화벽 장비에서 정책, 객체, 사용 로그를 추출하여 Excel로 저장합니다.
@@ -41,6 +42,7 @@ def export_policy_to_excel(
         config_type: 설정 타입 ('running' 또는 'candidate', PaloAlto만 지원)
         chunk_size: 대용량 데이터 처리시 청크 크기
         progress_callback: 진행률 콜백 함수
+        use_ssh: 히트카운트 수집 시 SSH 방식 사용 여부 (PaloAlto 전용)
 
     Returns:
         str: 저장된 엑셀 파일 경로
@@ -149,7 +151,7 @@ def export_policy_to_excel(
                             
                     elif step == "usage":
                         df = safe_dataframe_operation(
-                            lambda: collector.export_usage_logs(),
+                            lambda: collector.export_usage_logs(use_ssh=use_ssh),
                             f"{step} 추출",
                             logger
                         )
