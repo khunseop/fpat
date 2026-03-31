@@ -760,18 +760,30 @@ class PaloAltoAPI:
                 parsing_started = False
                 rule_count = 0
                 total_bytes = 0
+                last_log_bytes = 0
                 start_time = time.time()
                 last_heartbeat = start_time
                 data_started = False
 
                 while True:
                     if channel.recv_ready():
+                        chunk_raw = channel.recv(32768) # 버퍼 크기 확장
+                        current_chunk_size = len(chunk_raw)
+                        total_bytes += current_chunk_size
+                        
                         if not data_started:
-                            logging.info(f"[{vsys_name}] 데이터 수신 시작!")
+                            logging.info(f"[{vsys_name}] 데이터 수신 시작! (Surge 감지)")
                             data_started = True
                         
-                        chunk_raw = channel.recv(16384)
-                        total_bytes += len(chunk_raw)
+                        # 수신 급증(Surge) 발생 시 로그
+                        if current_chunk_size > 10000:
+                            logging.info(f"[{vsys_name}] 대량 데이터 수신 및 파싱 중... ({total_bytes/1024:.1f} KB 누적)")
+                        
+                        # 500KB 단위로 추가 진행 로그
+                        if total_bytes - last_log_bytes > 512000:
+                            logging.info(f"[{vsys_name}] 현재까지 {total_bytes/1024/1024:.2f} MB 수집됨...")
+                            last_log_bytes = total_bytes
+
                         chunk = chunk_raw.decode('utf-8', errors='ignore')
                         line_buffer += chunk
                         
@@ -785,46 +797,35 @@ class PaloAltoAPI:
                                 continue
                             if not parsing_started: continue
                             
-                            # 종료 조건 개선: 'intrazone-default'가 포함되어 있으면 파싱 중단
                             if 'intrazone-default' in line:
                                 parsing_started = False
                                 break
 
-                            # 룰 이름, 히트수, 타임스탬프 파싱
                             match = re.match(r'^([a-zA-Z0-9/._-]+)\s+(\d+)\s+([A-Za-z]{3}\s+[A-Za-z]{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\d{4}|-)', line)
                             if match:
                                 rule_name = match.group(1)
                                 timestamp_str = match.group(3).strip()
-
                                 last_hit_date = None
                                 if timestamp_str != '-':
                                     try:
                                         norm_ts = re.sub(r'\s+', ' ', timestamp_str)
                                         dt_obj = datetime.datetime.strptime(norm_ts, '%a %b %d %H:%M:%S %Y')
                                         last_hit_date = dt_obj.strftime('%Y-%m-%d %H:%M:%S')
-                                    except:
-                                        pass
-
-                                all_results.append({
-                                    "Vsys": vsys_name,
-                                    "Rule Name": rule_name,
-                                    "Last Hit Date": last_hit_date
-                                })
+                                    except: pass
+                                
+                                all_results.append({"Vsys": vsys_name, "Rule Name": rule_name, "Last Hit Date": last_hit_date})
                                 rule_count += 1
 
-                        # 프롬프트 확인 시 vsys 종료 (더 유연한 정규식 적용)
+                        # 프롬프트 확인 시 종료
                         if re.search(r'[>#]\s*$', line_buffer.strip()):
-                            logging.info(f"[{vsys_name}] 수집 완료: 총 {rule_count}개 규칙 (수신 데이터: {total_bytes/1024:.1f} KB)")
+                            logging.info(f"[{vsys_name}] 수집 완료: 총 {rule_count}개 규칙 (최종 데이터: {total_bytes/1024:.1f} KB)")
                             break
                     else:
-                        # 심박수 로그 (30초마다)
+                        # 대기 중 심박수 로그
                         now = time.time()
                         if now - last_heartbeat > 30:
-                            wait_elapsed = now - start_time
                             if not data_started:
-                                logging.info(f"[{vsys_name}] 응답 대기 중... ({int(wait_elapsed)}초 경과)")
-                            else:
-                                logging.info(f"[{vsys_name}] 데이터 수신 중... (현재까지 {total_bytes/1024:.1f} KB)")
+                                logging.info(f"[{vsys_name}] 장비 응답 대기 중... ({int(now - start_time)}초 경과)")
                             last_heartbeat = now
                     
                     if time.time() - start_time > 14400: # 4시간 타임아웃
