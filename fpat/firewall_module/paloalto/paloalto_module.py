@@ -4,8 +4,11 @@ import datetime
 import logging
 import requests
 import xml.etree.ElementTree as ET
+import paramiko
+import re
 
 import pandas as pd
+from typing import Union, Optional, List, Dict
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 
@@ -59,6 +62,8 @@ def apply_excel_style(file_name: str) -> None:
 class PaloAltoAPI:
     def __init__(self, hostname: str, username: str, password: str) -> None:
         self.hostname = hostname
+        self.username = username
+        self.password = password
         self.base_url = f'https://{hostname}/api/'
         self.api_key = self._get_api_key(username, password)
 
@@ -66,13 +71,6 @@ class PaloAltoAPI:
         """
         단일 DataFrame 또는 DataFrame 리스트를 엑셀 파일로 저장합니다.
         파일 이름은 현재 날짜, 호스트명, 시트명을 활용하여 자동 생성됩니다.
-        
-        :param data: 저장할 DataFrame 또는 DataFrame 리스트
-        :param sheet_names: 단일 시트명(str) 또는 시트명 리스트 (옵션)
-                            리스트가 아닌 경우 단일 시트로 저장됩니다.
-                            기본값은 단일 시트의 경우 "Sheet1",
-                            다중 시트의 경우 "Sheet1", "Sheet2", ... 로 지정됩니다.
-        :return: 생성된 엑셀 파일 이름
         """
         current_date = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
         
@@ -102,9 +100,6 @@ class PaloAltoAPI:
     def _get_member_texts(xml_elements) -> list:
         """
         주어진 XML 요소 리스트에서 텍스트 값을 추출합니다.
-
-        :param xml_elements: XML 요소 리스트
-        :return: 텍스트 값 리스트
         """
         try:
             return [element.text for element in xml_elements if element.text is not None]
@@ -115,10 +110,6 @@ class PaloAltoAPI:
     def list_to_string(list_data: list) -> str:
         """
         리스트 데이터를 콤마 구분 문자열로 변환합니다.
-        멤버 값 자체에 콤마(,)가 포함된 경우 따옴표("")로 감싸서 구분합니다.
-
-        :param list_data: 리스트 데이터
-        :return: 콤마로 구분된 문자열
         """
         processed_list = []
         for item in list_data:
@@ -170,8 +161,6 @@ class PaloAltoAPI:
     def get_vsys_list(self) -> list:
         """
         vsys 리스트를 반환합니다.
-
-        :return: vsys 이름 리스트
         """
         params = (
             ('key', self.api_key),
@@ -187,9 +176,6 @@ class PaloAltoAPI:
     def get_config(self, config_type: str = 'running') -> str:
         """
         설정 정보를 가져옵니다.
-
-        :param config_type: 'running' 또는 기타
-        :return: 설정 XML 문자열
         """
         action = 'show' if config_type == 'running' else 'get'
         params = (
@@ -204,9 +190,6 @@ class PaloAltoAPI:
     def save_config(self, config_type: str = 'running') -> bool:
         """
         설정 정보를 XML 파일로 저장합니다.
-
-        :param config_type: 'running' 또는 기타
-        :return: 저장 성공 여부
         """
         current_date = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
         config_data = self.get_config(config_type)
@@ -222,8 +205,6 @@ class PaloAltoAPI:
     def get_system_info(self) -> pd.DataFrame:
         """
         시스템 정보를 DataFrame으로 반환합니다.
-
-        :return: 시스템 정보 DataFrame
         """
         params = (
             ('type', 'op'),
@@ -248,8 +229,6 @@ class PaloAltoAPI:
     def get_system_state(self) -> pd.DataFrame:
         """
         시스템 상태 정보를 DataFrame으로 반환합니다.
-
-        :return: 시스템 상태 DataFrame
         """
         params = (
             ('type', 'op'),
@@ -288,9 +267,6 @@ class PaloAltoAPI:
     def export_security_rules(self, config_type: str = 'running') -> pd.DataFrame:
         """
         보안 규칙 정보를 DataFrame으로 반환합니다.
-
-        :param config_type: 'running' 또는 기타
-        :return: 보안 규칙 DataFrame
         """
         config_xml = self.get_config(config_type)
         tree = ET.fromstring(config_xml)
@@ -338,9 +314,6 @@ class PaloAltoAPI:
     def export_network_objects(self, config_type: str = 'running') -> pd.DataFrame:
         """
         네트워크 객체 정보를 DataFrame으로 반환합니다.
-
-        :param config_type: 'running' 또는 기타
-        :return: 네트워크 객체 DataFrame
         """
         config_xml = self.get_config(config_type)
         tree = ET.fromstring(config_xml)
@@ -365,9 +338,6 @@ class PaloAltoAPI:
     def export_network_group_objects(self, config_type: str = 'running') -> pd.DataFrame:
         """
         네트워크 그룹 객체 정보를 DataFrame으로 반환합니다.
-
-        :param config_type: 'running' 또는 기타
-        :return: 네트워크 그룹 객체 DataFrame
         """
         config_xml = self.get_config(config_type)
         tree = ET.fromstring(config_xml)
@@ -390,9 +360,6 @@ class PaloAltoAPI:
     def export_service_objects(self, config_type: str = 'running') -> pd.DataFrame:
         """
         서비스 객체 정보를 DataFrame으로 반환합니다.
-
-        :param config_type: 'running' 또는 기타
-        :return: 서비스 객체 DataFrame
         """
         config_xml = self.get_config(config_type)
         tree = ET.fromstring(config_xml)
@@ -419,9 +386,6 @@ class PaloAltoAPI:
     def export_service_group_objects(self, config_type: str = 'running') -> pd.DataFrame:
         """
         서비스 그룹 객체 정보를 DataFrame으로 반환합니다.
-
-        :param config_type: 'running' 또는 기타
-        :return: 서비스 그룹 객체 DataFrame
         """
         config_xml = self.get_config(config_type)
         tree = ET.fromstring(config_xml)
@@ -444,9 +408,6 @@ class PaloAltoAPI:
     def export_hit_count(self, vsys_name: str = 'vsys1') -> pd.DataFrame:
         """
         히트 카운트 정보를 DataFrame으로 반환합니다.
-
-        :param vsys_name: vsys 이름
-        :return: 히트 카운트 DataFrame
         """
         params = (
             ('type', 'op'),
@@ -542,9 +503,6 @@ class PaloAltoAPI:
     def export_nat_rules(self, config_type: str = 'running') -> pd.DataFrame:
         """
         NAT 정책 정보를 DataFrame으로 반환합니다.
-
-        :param config_type: 'running' 또는 기타
-        :return: NAT 정책 DataFrame
         """
         config_xml = self.get_config(config_type)
         tree = ET.fromstring(config_xml)
@@ -595,8 +553,6 @@ class PaloAltoAPI:
     def get_interface_management_info(self) -> pd.DataFrame:
         """
         관리 인터페이스 정보를 DataFrame으로 반환합니다.
-
-        :return: 관리 인터페이스 정보 DataFrame
         """
         try:
             params = (
@@ -631,9 +587,6 @@ class PaloAltoAPI:
     def get_resource_usage(self, days: int = 1) -> pd.DataFrame:
         """
         리소스 사용률 정보를 DataFrame으로 반환합니다.
-
-        :param days: 조회할 일수 (기본값: 1)
-        :return: 리소스 사용률 DataFrame
         """
         try:
             params = (
@@ -698,8 +651,6 @@ class PaloAltoAPI:
     def get_system_state_detailed(self) -> pd.DataFrame:
         """
         상세 시스템 상태 정보를 DataFrame으로 반환합니다.
-
-        :return: 시스템 상태 정보 DataFrame
         """
         try:
             params = (
@@ -747,3 +698,147 @@ class PaloAltoAPI:
         except Exception as error:
             logging.error("시스템 상태 조회 중 오류 발생: %s", error)
             return pd.DataFrame()
+
+    def export_last_hit_date_ssh(self, vsys: Union[list, set, None] = None) -> pd.DataFrame:
+        """
+        SSH를 통해 각 규칙의 최근 히트 일자 정보를 수집합니다.
+        API 타임아웃 버그 대응용이며, 대용량 정책의 경우 응답 시작까지 수 분에서 수 시간이 걸릴 수 있습니다.
+        """
+        target_vsys_list = ['vsys1']
+        if vsys:
+            target_vsys_list = [str(v) for v in vsys]
+
+        logging.info(f"SSH를 통한 히트카운트 수집 시작 (Target vsys: {target_vsys_list})")
+        all_results = []
+
+        ssh = None
+        try:
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            
+            ssh.connect(
+                self.hostname, 
+                port=22, 
+                username=self.username, 
+                password=self.password, 
+                timeout=30, 
+                look_for_keys=False, 
+                allow_agent=False
+            )
+            
+            transport = ssh.get_transport()
+            if transport:
+                transport.set_keepalive(60)
+
+            channel = ssh.invoke_shell()
+            
+            def send_and_wait(command: str, wait_timeout: int = 15):
+                channel.send(command + "\n")
+                output = ""
+                start_time = time.time()
+                while time.time() - start_time < wait_timeout:
+                    if channel.recv_ready():
+                        chunk = channel.recv(4096).decode('utf-8', errors='ignore')
+                        output += chunk
+                        if output.strip().endswith(('>', '#')):
+                            return output
+                    time.sleep(0.5)
+                return output
+
+            # CLI 설정
+            send_and_wait("", 10) # 배너 대기
+            send_and_wait("set cli scripting-mode on")
+            send_and_wait("set cli pager off")
+
+            for vsys_name in target_vsys_list:
+                command = f"show rule-hit-count vsys vsys-name {vsys_name} rule-base security rules all"
+                logging.info(f"명령어 전송 ({vsys_name}): {command}")
+                logging.info("장비에서 리포트를 생성 중입니다. 응답 대기 중...")
+                channel.send(command + "\n")
+
+                line_buffer = ""
+                parsing_started = False
+                rule_count = 0
+                total_bytes = 0
+                start_time = time.time()
+                last_heartbeat = start_time
+                data_started = False
+
+                while True:
+                    if channel.recv_ready():
+                        if not data_started:
+                            logging.info(f"[{vsys_name}] 데이터 수신 시작!")
+                            data_started = True
+                        
+                        chunk_raw = channel.recv(16384)
+                        total_bytes += len(chunk_raw)
+                        chunk = chunk_raw.decode('utf-8', errors='ignore')
+                        line_buffer += chunk
+                        
+                        while "\n" in line_buffer:
+                            line, line_buffer = line_buffer.split("\n", 1)
+                            line = line.strip()
+                            
+                            if not line: continue
+                            if '----------' in line:
+                                parsing_started = True
+                                continue
+                            if not parsing_started: continue
+                            
+                            # 종료 조건 개선: 'intrazone-default'가 포함되어 있으면 파싱 중단
+                            if 'intrazone-default' in line:
+                                parsing_started = False
+                                break
+
+                            # 룰 이름, 히트수, 타임스탬프 파싱
+                            match = re.match(r'^([a-zA-Z0-9/._-]+)\s+(\d+)\s+([A-Za-z]{3}\s+[A-Za-z]{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\d{4}|-)', line)
+                            if match:
+                                rule_name = match.group(1)
+                                timestamp_str = match.group(3).strip()
+
+                                last_hit_date = None
+                                if timestamp_str != '-':
+                                    try:
+                                        norm_ts = re.sub(r'\s+', ' ', timestamp_str)
+                                        dt_obj = datetime.datetime.strptime(norm_ts, '%a %b %d %H:%M:%S %Y')
+                                        last_hit_date = dt_obj.strftime('%Y-%m-%d %H:%M:%S')
+                                    except:
+                                        pass
+
+                                all_results.append({
+                                    "Vsys": vsys_name,
+                                    "Rule Name": rule_name,
+                                    "Last Hit Date": last_hit_date
+                                })
+                                rule_count += 1
+
+                        # 프롬프트 확인 시 vsys 종료 (더 유연한 정규식 적용)
+                        if re.search(r'[>#]\s*$', line_buffer.strip()):
+                            logging.info(f"[{vsys_name}] 수집 완료: 총 {rule_count}개 규칙 (수신 데이터: {total_bytes/1024:.1f} KB)")
+                            break
+                    else:
+                        # 심박수 로그 (30초마다)
+                        now = time.time()
+                        if now - last_heartbeat > 30:
+                            wait_elapsed = now - start_time
+                            if not data_started:
+                                logging.info(f"[{vsys_name}] 응답 대기 중... ({int(wait_elapsed)}초 경과)")
+                            else:
+                                logging.info(f"[{vsys_name}] 데이터 수신 중... (현재까지 {total_bytes/1024:.1f} KB)")
+                            last_heartbeat = now
+                    
+                    if time.time() - start_time > 14400: # 4시간 타임아웃
+                        logging.error(f"[{vsys_name}] 최대 처리 시간 초과")
+                        break
+                    
+                    time.sleep(0.1)
+
+        except Exception as e:
+            logging.error(f"SSH 수집 실패: {e}", exc_info=True)
+            raise e
+        finally:
+            if ssh:
+                ssh.close()
+                logging.info("SSH 연결 종료")
+
+        return pd.DataFrame(all_results)
