@@ -158,17 +158,27 @@ class PaloAltoCollector(FirewallInterface):
 
             for vsys_name in target_vsys_list:
                 command = f"show rule-hit-count vsys vsys-name {vsys_name} rule-base security rules all"
-                self.logger.info(f"명령어 실행 ({vsys_name}): {command}")
+                self.logger.info(f"명령어 전송 ({vsys_name}): {command}")
+                self.logger.info("장비에서 리포트를 생성 중입니다. 대용량 정책의 경우 응답 시작까지 수 분에서 수 시간이 걸릴 수 있습니다.")
                 channel.send(command + "\n")
 
                 line_buffer = ""
                 parsing_started = False
                 rule_count = 0
-                vsys_start_time = time.time()
+                total_bytes = 0
+                start_time = time.time()
+                last_heartbeat = start_time
+                data_started = False
 
                 while True:
                     if channel.recv_ready():
-                        chunk = channel.recv(8192).decode('utf-8', errors='ignore')
+                        if not data_started:
+                            self.logger.info(f"[{vsys_name}] 데이터 수신 시작!")
+                            data_started = True
+                        
+                        chunk_raw = channel.recv(16384)
+                        total_bytes += len(chunk_raw)
+                        chunk = chunk_raw.decode('utf-8', errors='ignore')
                         line_buffer += chunk
                         
                         while "\n" in line_buffer:
@@ -184,40 +194,41 @@ class PaloAltoCollector(FirewallInterface):
                                 parsing_started = False
                                 break
 
-                            # 룰 이름, 히트수, 타임스탬프 파싱
                             match = re.match(r'^([a-zA-Z0-9/._-]+)\s+(\d+)\s+([A-Za-z]{3}\s+[A-Za-z]{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\d{4}|-)', line)
                             if match:
                                 rule_name = match.group(1)
                                 timestamp_str = match.group(3).strip()
-
                                 last_hit_date = None
                                 if timestamp_str != '-':
                                     try:
                                         norm_ts = re.sub(r'\s+', ' ', timestamp_str)
                                         dt_obj = datetime.datetime.strptime(norm_ts, '%a %b %d %H:%M:%S %Y')
                                         last_hit_date = dt_obj.strftime('%Y-%m-%d %H:%M:%S')
-                                    except:
-                                        pass
-
-                                all_results.append({
-                                    "Vsys": vsys_name,
-                                    "Rule Name": rule_name,
-                                    "Last Hit Date": last_hit_date
-                                })
-                                rule_count += 1
+                                    except: pass
                                 
-                                if rule_count % 100 == 0:
-                                    self.logger.info(f"[{vsys_name}] {rule_count}개 규칙 처리 중...")
+                                all_results.append({"Vsys": vsys_name, "Rule Name": rule_name, "Last Hit Date": last_hit_date})
+                                rule_count += 1
 
-                        # 프롬프트 확인 시 vsys 종료
+                        # 프롬프트 확인 시 종료
                         if line_buffer.strip().endswith(('>', '#')):
+                            self.logger.info(f"[{vsys_name}] 수집 완료: 총 {rule_count}개 규칙 (수신 데이터: {total_bytes/1024:.1f} KB)")
                             break
+                    else:
+                        # 데이터를 기다리는 동안 심박수 로그 출력 (30초마다)
+                        now = time.time()
+                        if now - last_heartbeat > 30:
+                            wait_elapsed = now - start_time
+                            if not data_started:
+                                self.logger.info(f"[{vsys_name}] 응답 대기 중... ({int(wait_elapsed)}초 경과)")
+                            else:
+                                self.logger.info(f"[{vsys_name}] 데이터 수신 중... (현재까지 {total_bytes/1024:.1f} KB)")
+                            last_heartbeat = now
                     
-                    if time.time() - vsys_start_time > 14400: # 4시간 타임아웃
-                        self.logger.error(f"{vsys_name} 처리 시간 초과")
+                    if time.time() - start_time > 14400: # 4시간 전체 타임아웃
+                        self.logger.error(f"[{vsys_name}] 최대 처리 시간 초과")
                         break
                     
-                    time.sleep(0.01)
+                    time.sleep(0.1)
 
         except Exception as e:
             self.logger.error(f"SSH 수집 실패: {e}", exc_info=True)
