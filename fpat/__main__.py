@@ -10,6 +10,12 @@ import sys
 import os
 import logging
 
+# 패키지 루트 경로 추가 (fpat.* 임포트가 가능하도록)
+current_file_path = os.path.abspath(__file__)
+project_root = os.path.dirname(os.path.dirname(current_file_path))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 # 모듈별 CLI 메인 함수 임포트
 from fpat.firewall_module.cli import main as extract_main
 from fpat.policy_deletion_processor.cli import main as process_main

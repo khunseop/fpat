@@ -38,6 +38,8 @@ def build():
         "--onefile",      # 단일 파일 빌드
         "--console",      # 콘솔 창 활성화
         f"--name={exe_name}",
+        # fpat 패키지 전체 수집
+        "--collect-all=fpat",
         # 의존성 강제 수집 (pandas, openpyxl 등)
         "--collect-all=pandas",
         "--collect-all=openpyxl",
