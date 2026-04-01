@@ -408,6 +408,7 @@ class PaloAltoAPI:
     def export_hit_count(self, vsys_name: str = 'vsys1') -> pd.DataFrame:
         """
         히트 카운트 정보를 DataFrame으로 반환합니다.
+        기본 정책(intrazone-default, interzone-default)은 제외합니다.
         """
         params = (
             ('type', 'op'),
@@ -426,6 +427,11 @@ class PaloAltoAPI:
         hit_counts = []
         for rule in rule_entries:
             rule_name = str(rule.attrib.get('name'))
+            
+            # 기본 정책 제외
+            if rule_name in ['intrazone-default', 'interzone-default']:
+                continue
+
             member_texts = self._get_member_texts(rule)
             try:
                 hit_count = member_texts[1]
@@ -772,16 +778,12 @@ class PaloAltoAPI:
                         total_bytes += current_chunk_size
                         
                         if not data_started:
-                            logging.info(f"[{vsys_name}] 데이터 수신 시작! (Surge 감지)")
+                            logging.info(f"[{vsys_name}] 데이터 수신 시작!")
                             data_started = True
-                        
-                        # 수신 급증(Surge) 발생 시 로그
-                        if current_chunk_size > 10000:
-                            logging.info(f"[{vsys_name}] 대량 데이터 수신 및 파싱 중... ({total_bytes/1024:.1f} KB 누적)")
                         
                         # 500KB 단위로 추가 진행 로그
                         if total_bytes - last_log_bytes > 512000:
-                            logging.info(f"[{vsys_name}] 현재까지 {total_bytes/1024/1024:.2f} MB 수집됨...")
+                            logging.info(f"[{vsys_name}] 수집 중... (현재: {rule_count}개 규칙, {total_bytes/1024/1024:.2f} MB)")
                             last_log_bytes = total_bytes
 
                         chunk = chunk_raw.decode('utf-8', errors='ignore')
@@ -797,7 +799,8 @@ class PaloAltoAPI:
                                 continue
                             if not parsing_started: continue
                             
-                            if 'intrazone-default' in line:
+                            # 종료 조건 개선: 기본 정책 발견 시 파싱 중단
+                            if 'intrazone-default' in line or 'interzone-default' in line:
                                 parsing_started = False
                                 break
 
@@ -821,11 +824,14 @@ class PaloAltoAPI:
                             logging.info(f"[{vsys_name}] 수집 완료: 총 {rule_count}개 규칙 (최종 데이터: {total_bytes/1024:.1f} KB)")
                             break
                     else:
-                        # 대기 중 심박수 로그
+                        # 대기 및 데이터 수신 중 심박수 로그 (10초마다)
                         now = time.time()
-                        if now - last_heartbeat > 30:
+                        if now - last_heartbeat > 10:
                             if not data_started:
                                 logging.info(f"[{vsys_name}] 장비 응답 대기 중... ({int(now - start_time)}초 경과)")
+                            else:
+                                # 데이터가 조금씩 들어오는 경우를 위한 진행 상황 표시
+                                logging.info(f"[{vsys_name}] 데이터 수신 중... (현재: {rule_count}개 규칙, {total_bytes/1024:.1f} KB)")
                             last_heartbeat = now
                     
                     if time.time() - start_time > 14400: # 4시간 타임아웃
