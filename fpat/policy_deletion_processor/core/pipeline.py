@@ -7,13 +7,20 @@
 
 import logging
 from typing import List, Dict, Any, Type, Optional
-from ..processors.base_processor import BaseProcessor
-from ..processors import (
-    RequestParser, RequestExtractor, MisIdAdder, ApplicationAggregator,
-    RequestInfoAdder, ExceptionHandler, DuplicatePolicyClassifier,
-    MergeHitcount, PolicyUsageProcessor, NotificationClassifier,
-    AutoRenewalChecker, AutoCollector, RedundancyProcessor
-)
+from fpat.policy_deletion_processor.processors.base_processor import BaseProcessor
+from fpat.policy_deletion_processor.processors.request_parser import RequestParser
+from fpat.policy_deletion_processor.processors.request_extractor import RequestExtractor
+from fpat.policy_deletion_processor.processors.mis_id_adder import MisIdAdder
+from fpat.policy_deletion_processor.processors.application_aggregator import ApplicationAggregator
+from fpat.policy_deletion_processor.processors.request_info_adder import RequestInfoAdder
+from fpat.policy_deletion_processor.processors.exception_handler import ExceptionHandler
+from fpat.policy_deletion_processor.processors.duplicate_policy_classifier import DuplicatePolicyClassifier
+from fpat.policy_deletion_processor.processors.merge_hitcount import MergeHitcount
+from fpat.policy_deletion_processor.processors.policy_usage_processor import PolicyUsageProcessor
+from fpat.policy_deletion_processor.processors.notification_classifier import NotificationClassifier
+from fpat.policy_deletion_processor.processors.auto_renewal_checker import AutoRenewalChecker
+from fpat.policy_deletion_processor.processors.auto_collector import AutoCollector
+from fpat.policy_deletion_processor.processors.redundancy_processor import RedundancyProcessor
 
 logger = logging.getLogger(__name__)
 

@@ -3,8 +3,9 @@
 
 from abc import ABC, abstractmethod
 import logging
-from ..core.config_manager import ConfigManager
-from ..utils.file_manager import FileManager
+# core 패키지의 __init__을 거치지 않고 직접 모듈 임포트
+from fpat.policy_deletion_processor.core.config_manager import ConfigManager
+from fpat.policy_deletion_processor.utils.file_manager import FileManager
 
 class BaseProcessor(ABC):
     """모든 정책 처리 프로세서의 베이스 클래스"""
