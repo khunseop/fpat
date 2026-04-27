@@ -74,25 +74,30 @@ class MergeHitcount(BaseProcessor):
                     logger.error(f"{name} 파일에 필수 컬럼이 누락되었습니다: {missing}")
                     return False
 
-            # Rule Name을 기준으로 두 데이터프레임을 병합
-            merged_df = pd.merge(df1, df2, on='Rule Name', suffixes=('_df1', '_df2'))
+            # Rule Name을 기준으로 두 데이터프레임을 병합 (Outer Join으로 정책 누락 방지)
+            merged_df = pd.merge(df1, df2, on='Rule Name', how='outer', suffixes=('_df1', '_df2'))
 
             if merged_df.empty:
                 logger.warning("병합된 데이터가 없습니다. Rule Name이 일치하는지 확인하세요.")
                 return False
 
-            # 데이터 병합 로직
-            # Vsys는 첫 번째 파일 기준 (보통 동일함)
+            # 데이터 병합 로직 (결측치 처리 포함)
+            # Vsys는 존재하는 값 우선 사용
             if 'Vsys_df1' in merged_df.columns:
-                merged_df['Vsys'] = merged_df['Vsys_df1']
+                merged_df['Vsys'] = merged_df['Vsys_df1'].fillna(merged_df.get('Vsys_df2', ''))
             
-            # Hit Count 합산 (컬럼이 있는 경우만)
-            if 'Hit Count_df1' in merged_df.columns and 'Hit Count_df2' in merged_df.columns:
-                merged_df['Hit Count'] = merged_df['Hit Count_df1'] + merged_df['Hit Count_df2']
+            # Hit Count 합산 (NaN은 0으로 처리)
+            hc1 = merged_df.get('Hit Count_df1', 0).fillna(0)
+            hc2 = merged_df.get('Hit Count_df2', 0).fillna(0)
+            merged_df['Hit Count'] = hc1 + hc2
             
             # Last Hit Date는 더 최근 날짜(Max), Unused Days는 더 적은 일수(Min)
+            # NaN 값이 비교에 방해되지 않도록 적절한 기본값 설정 후 비교
             merged_df['Last Hit Date'] = merged_df[['Last Hit Date_df1', 'Last Hit Date_df2']].max(axis=1)
             merged_df['Unused Days'] = merged_df[['Unused Days_df1', 'Unused Days_df2']].min(axis=1)
+            
+            # Unused Days가 여전히 NaN인 경우 (양쪽 장비 모두 기록 없음) 99999 부여
+            merged_df['Unused Days'] = merged_df['Unused Days'].fillna(99999)
             
             # 병합 후 중복/임시 컬럼 제거
             cols_to_drop = [c for c in merged_df.columns if '_df1' in c or '_df2' in c]
