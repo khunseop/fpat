@@ -21,8 +21,12 @@ class RedundancyProcessor(BaseProcessor):
         """중복 분석을 수행합니다."""
         vendor = kwargs.get('vendor', 'paloalto')
         
-        print("분석할 정책 파일을 선택하세요 (추출된 Full Data):")
+        # 파일이 이미 지정되어 있는지 확인 (큐에서 가로챔)
         input_file = file_manager.select_files()
+        if not input_file:
+            print("분석할 정책 파일을 선택하세요 (추출된 Full Data):")
+            input_file = file_manager.select_files()
+            
         if not input_file:
             return False
 

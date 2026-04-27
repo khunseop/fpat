@@ -77,8 +77,15 @@ class AutoCollector(BaseProcessor):
                 # FileManager에 파일 강제 주입하여 MergeHitcount 실행
                 file_manager.set_forced_files([results['pri'], results['sec']])
                 merger = MergeHitcount(self.config)
-                return merger.run(file_manager)
+                success = merger.run(file_manager)
+                
+                # [개선] 다음 단계(Task 15)에서 분석을 위해 pri_full 파일을 다시 사용하도록 큐에 삽입
+                if success:
+                    file_manager.set_forced_files([results['pri']])
+                return success
             
+            # HA가 아닌 경우 추출된 파일 경로를 큐에 삽입하여 다음 단계에서 바로 사용 가능하게 함
+            file_manager.set_forced_files([results['pri']])
             return True
 
         except Exception as e:
