@@ -83,17 +83,26 @@ class ApplicationAggregator(BaseProcessor):
             df = df.reindex(columns=final_columns, fill_value="")  # 공백으로 채우기
 
             # 이메일 생성 로직 추가 (설정 파일의 domain_map 참조)
-            df['WRITE_PERSON_EMAIL'] = df.apply(
-                lambda row: f"{row['WRITE_PERSON_ID']}@{row['REQUESTER_EMAIL'].split('@')[1]}" 
-                if row.get('WRITE_PERSON_EMAIL') == "" and pd.notna(row.get('WRITE_PERSON_ID')) else row.get('WRITE_PERSON_EMAIL', ''), 
-                axis=1
-            )
+            def get_domain(email):
+                if pd.isna(email) or not isinstance(email, str) or '@' not in email:
+                    return None
+                return email.split('@')[1]
+
+            def map_write_email(row):
+                if row.get('WRITE_PERSON_EMAIL') == "" and pd.notna(row.get('WRITE_PERSON_ID')):
+                    domain = get_domain(row.get('REQUESTER_EMAIL'))
+                    if domain:
+                        return f"{row['WRITE_PERSON_ID']}@{domain}"
+                return row.get('WRITE_PERSON_EMAIL', '')
+
+            df['WRITE_PERSON_EMAIL'] = df.apply(map_write_email, axis=1)
 
             def map_approval_email(row):
-                if not row.get('REQUESTER_EMAIL') or '@' not in row['REQUESTER_EMAIL']:
+                req_email = row.get('REQUESTER_EMAIL')
+                if pd.isna(req_email) or not isinstance(req_email, str) or '@' not in req_email:
                     return row.get('APPROVAL_PERSON_EMAIL', '')
                 
-                domain = row['REQUESTER_EMAIL'].split('@')[1]
+                domain = req_email.split('@')[1]
                 target_domain = domain_map.get(domain, domain)
                 
                 if row.get('APPROVAL_PERSON_EMAIL') == "" and pd.notna(row.get('APPROVAL_PERSON_ID')):
