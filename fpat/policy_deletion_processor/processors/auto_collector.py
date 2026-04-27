@@ -8,6 +8,7 @@
 import logging
 import threading
 import os
+from datetime import datetime
 from .base_processor import BaseProcessor
 from .merge_hitcount import MergeHitcount
 from ...firewall_module.collector_factory import FirewallCollectorFactory
@@ -31,11 +32,16 @@ class AutoCollector(BaseProcessor):
         try:
             results = {}
             threads = []
+            today = datetime.now().strftime('%Y-%m-%d')
+            
+            # 출력 폴더 생성
+            if not os.path.exists("outputs"):
+                os.makedirs("outputs")
 
             # 1. Pri 장비 전체 데이터 추출 (Policy, Objects, Usage)
             def collect_pri():
                 logger.info(f"Primary 장비 데이터 추출 시작: {pri_info['hostname']}")
-                output = f"pri_full_{pri_info['hostname']}.xlsx"
+                output = os.path.join("outputs", f"{today}_{pri_info['hostname']}_policy.xlsx")
                 export_policy_to_excel(
                     vendor=vendor,
                     hostname=pri_info['hostname'],
@@ -51,7 +57,7 @@ class AutoCollector(BaseProcessor):
                 if not sec_info:
                     return
                 logger.info(f"Secondary 장비 사용이력 추출 시작: {sec_info['hostname']}")
-                output = f"sec_usage_{sec_info['hostname']}.xlsx"
+                output = os.path.join("outputs", f"{today}_{sec_info['hostname']}_usage.xlsx")
                 export_policy_to_excel(
                     vendor=vendor,
                     hostname=sec_info['hostname'],

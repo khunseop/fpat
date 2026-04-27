@@ -8,6 +8,7 @@
 import logging
 import os
 import pandas as pd
+from datetime import datetime
 from .base_processor import BaseProcessor
 from ...firewall_analyzer.core.redundancy_analyzer import RedundancyAnalyzer
 from ...firewall_analyzer.core.policy_resolver import PolicyResolver
@@ -59,9 +60,16 @@ class RedundancyProcessor(BaseProcessor):
                 logger.warning("중복 정책이 발견되지 않았습니다.")
                 return True
                 
-            # 4. 결과 저장
-            output_file = f"Redundant_{input_file}"
+            # 4. 결과 저장 (파일명 규칙 적용)
+            today = datetime.now().strftime('%Y-%m-%d')
+            # 입력 파일명에서 IP 추출 시도 (예: 2026-04-27_1.1.1.1_policy.xlsx)
+            filename = os.path.basename(input_file)
+            parts = filename.split('_')
+            ip_part = parts[1] if len(parts) > 1 else 'unknown'
+            
+            output_file = os.path.join("outputs", f"{today}_{ip_part}_redundancy.xlsx")
             result_df.to_excel(output_file, index=False)
+            
             logger.info(f"중복 분석 완료: {len(result_df)}개 항목 발견. 저장: {output_file}")
             print(f"중복 분석 결과가 '{output_file}'에 저장되었습니다.")
             
