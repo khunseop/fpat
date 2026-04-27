@@ -172,6 +172,14 @@ class RequestParser(BaseProcessor):
             
             print()  # 줄바꿈
             
+            # 엑셀 파일 손상 방지를 위한 데이터 클렌징 (제어 문자 제거)
+            def clean_illegal_chars(val):
+                if isinstance(val, str):
+                    return "".join(c for c in val if c.isprintable() or c in "\t\n\r")
+                return val
+
+            df = df.applymap(clean_illegal_chars)
+            
             new_file_name = file_manager.update_version(file_name)
             df.to_excel(new_file_name, index=False)
             logger.info(f"신청 유형 파싱 결과를 '{new_file_name}'에 저장했습니다.")

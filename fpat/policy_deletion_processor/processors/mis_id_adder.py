@@ -66,8 +66,18 @@ class MisIdAdder(BaseProcessor):
             
             print()  # 줄바꿈
             
+            # 엑셀 파일 손상 방지를 위한 데이터 클렌징 (제어 문자 제거)
+            def clean_illegal_chars(val):
+                if isinstance(val, str):
+                    # 엑셀에서 허용하지 않는 ASCII 제어 문자 제거 (00-1F, 단 09, 0A, 0D는 허용)
+                    return "".join(c for c in val if c.isprintable() or c in "\t\n\r")
+                return val
+
+            rule_df = rule_df.applymap(clean_illegal_chars)
+            
             new_file_name = file_manager.update_version(file)
-            rule_df.to_excel(new_file_name, index=False, engine='openpyxl')
+            # engine='openpyxl'을 사용하되 가장 표준적인 방식으로 저장
+            rule_df.to_excel(new_file_name, index=False)
             
             logger.info(f"{updated_count}개의 정책에 MIS ID를 추가했습니다.")
             logger.info(f"MIS ID 추가 결과를 '{new_file_name}'에 저장했습니다.")
