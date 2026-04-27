@@ -101,13 +101,27 @@ class MergeHitcount(BaseProcessor):
             # 90일 기준에 따라 '미사용여부' 컬럼 생성/갱신
             merged_df['미사용여부'] = merged_df['Unused Days'].apply(lambda x: '미사용' if x > 90 else '사용')
             
-            # 엑셀 파일로 결과 저장
-            output_excel_file = f"Merged_{first_file}"
+            # 엑셀 파일로 결과 저장 (표준 포맷 적용)
+            import os
+            from datetime import datetime
+            today = datetime.now().strftime('%Y-%m-%d')
+            
+            # 첫 번째 파일명에서 IP 추출 시도
+            filename = os.path.basename(first_file)
+            parts = filename.split('_')
+            ip_part = parts[1] if len(parts) > 1 else 'unknown'
+            
+            if not os.path.exists("outputs"):
+                os.makedirs("outputs")
+            output_excel_file = os.path.join("outputs", f"{today}_{ip_part}_merged.xlsx")
+            
             merged_df.to_excel(output_excel_file, index=False)
 
             logger.info(f"병합 완료: {len(merged_df)}개 규칙 정보를 '{output_excel_file}'에 저장했습니다.")
             print(f"데이터를 {output_excel_file} 파일로 저장했습니다.")
             
+            # 다음 단계를 위해 결과 파일 등록
+            file_manager.set_forced_files([output_excel_excel_file if 'output_excel_excel_file' in locals() else output_excel_file])
             return True
         except Exception as e:
             logger.exception(f"Merge 중 오류 발생: {e}")

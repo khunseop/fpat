@@ -104,8 +104,20 @@ def workflow_wizard():
         pipeline.add_step(0, vendor=vendor, pri_info=pri_info, sec_info=sec_info)
         
     elif mode == "3":
-        print("\n실행할 태스크 번호를 공백으로 구분하여 입력하세요.")
-        print("번호 안내: 1(파싱), 6/7(예외마킹), 10(병합), 11/12(사용반영), 15(중복분석)")
+        print("\n[단계 3] 실행할 태스크 선택")
+        print("-" * 30)
+        tasks_info = [
+            "0: 자동추출/병합", "1: 신청정보 파싱", "2: 신청번호 추출", "3: MIS ID 매핑",
+            "4: 앱 집계", "5: 신청정보 합산", "6: 예외처리(PA)", "7: 예외처리(SE)",
+            "8: 중복분류", "9: 중복업데이트", "10: 사용이력병합", "11: 미사용반영",
+            "12: 예외반영", "13: 통보대상 분류", "14: 자동연장 체크", "15: 중복분석"
+        ]
+        
+        # 4열 종대로 출력
+        for i in range(0, len(tasks_info), 4):
+            print("  ".join(f"{t:<15}" for t in tasks_info[i:i+4]))
+            
+        print("\n실행할 태스크 번호를 공백으로 구분하여 입력하세요 (예: 1 6 11 15).")
         task_input = get_input("태스크 번호")
         if task_input:
             tasks = task_input.split()

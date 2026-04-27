@@ -31,18 +31,17 @@ class FileManager:
 
     def update_version(self, filename, final_version=False):
         """
-        파일 이름의 버전을 업데이트합니다.
+        파일 이름의 버전을 업데이트하고 outputs 폴더 경로를 반환합니다.
         """
-        base_name, ext = filename.rsplit('.', 1)
+        # 기존 경로 정보 제거하고 파일명만 추출
+        pure_filename = os.path.basename(filename)
+        base_name, ext = pure_filename.rsplit('.', 1)
         
         version_format = self.config.get('file_management.policy_version_format', '_v{version}')
         final_suffix = self.config.get('file_management.final_version_suffix', '_vf')
         
         match = re.search(r'_v(\d+)$', base_name)
         final_match = re.search(r'_vf$', base_name)
-        
-        if final_match:
-            return filename
         
         if final_version:
             if match:
@@ -57,8 +56,12 @@ class FileManager:
             else:
                 new_base_name = f"{base_name}{version_format.format(version=1)}"
         
-        new_filename = f"{new_base_name}.{ext}"
-        logger.info(f"파일 이름을 '{filename}'에서 '{new_filename}'으로 업데이트했습니다.")
+        # 항상 outputs 폴더에 저장
+        if not os.path.exists("outputs"):
+            os.makedirs("outputs")
+            
+        new_filename = os.path.join("outputs", f"{new_base_name}.{ext}")
+        logger.info(f"결과 파일 경로: {new_filename}")
         return new_filename
     
     def select_files(self, extension=None):
