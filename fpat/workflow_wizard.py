@@ -12,7 +12,8 @@ import logging
 from pathlib import Path
 
 # 패키지 경로 추가
-sys.path.insert(0, str(Path(__file__).parent.parent))
+current_file = Path(__file__).resolve()
+sys.path.insert(0, str(current_file.parent.parent))
 
 from fpat.policy_deletion_processor.core.config_manager import ConfigManager
 from fpat.policy_deletion_processor.core.pipeline import Pipeline
@@ -76,7 +77,7 @@ def workflow_wizard():
         pipeline.add_step(0, vendor=vendor, pri_info=pri_info, sec_info=sec_info) # 추출/병합
         pipeline.add_step(15, vendor=vendor) # 중복 분석
         pipeline.add_step(1) # 신청번호 파싱
-        # ... 추가하고 싶은 단계 나열
+        # 필요시 추가 단계 등록
         
     elif mode == "2":
         pipeline.add_step(0, vendor=vendor, pri_info=pri_info, sec_info=sec_info)
@@ -84,9 +85,14 @@ def workflow_wizard():
     elif mode == "3":
         print("\n실행할 태스크 번호를 공백으로 구분하여 입력하세요.")
         print("예: 1 2 5 8 11 (파싱, 추출, 매칭, 중복분류, 미사용반영)")
-        tasks = get_input("태스크 번호").split()
-        for t in tasks:
-            pipeline.add_step(int(t))
+        task_input = get_input("태스크 번호")
+        if task_input:
+            tasks = task_input.split()
+            for t in tasks:
+                pipeline.add_step(int(t))
+        else:
+            print("태스크 번호가 입력되지 않았습니다.")
+            return
             
     print("\n" + "=" * 60)
     print("🚀 워크플로우 실행을 시작합니다...")
@@ -101,5 +107,8 @@ if __name__ == "__main__":
     try:
         workflow_wizard()
     except KeyboardInterrupt:
-        print("\n사용자에 의해 종료되었습니다.")
+        print("\n\n[!] 사용자에 의해 종료되었습니다.")
         sys.exit(0)
+    except Exception as e:
+        logger.exception(f"예기치 못한 오류 발생: {e}")
+        sys.exit(1)
