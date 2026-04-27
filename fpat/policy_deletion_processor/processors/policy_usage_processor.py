@@ -139,4 +139,41 @@ class PolicyUsageProcessor(BaseProcessor):
             if policy_df.empty or duplicate_df.empty:
                 logger.error("데이터 로드 실패")
                 return False
- 
+
+            # 필요한 컬럼이 있는지 확인
+            if 'Rule Name' not in duplicate_df.columns or '미사용예외' not in duplicate_df.columns:
+                logger.error("중복정책 파일에 'Rule Name' 또는 '미사용예외' 컬럼이 없습니다.")
+                return False
+                        
+            # '미사용예외'가 True인 'Rule Name'을 집합(set)으로 저장 (검색 속도 최적화)
+            exception_rules = set(duplicate_df.loc[duplicate_df['미사용예외'] == True, 'Rule Name'].astype(str))
+            # 정책 파일에 미사용예외 데이터 추가
+            updated_count = 0
+            total = len(policy_df)
+
+            # iterrows()를 사용하여 policy_df 순회하면서 변경
+            for idx, row in policy_df.iterrows():
+                print(f"\r미사용 정보 업데이트 중: {idx + 1}/{total}", end='', flush=True)
+                rule_name = str(row['Rule Name'])
+                if rule_name in exception_rules:
+                    if policy_df.at[idx, '미사용여부'] != '미사용예외':
+                        policy_df.at[idx, '미사용여부'] = '미사용예외'
+                        updated_count += 1
+                        
+            print()  # 줄바꿈
+            
+            # 결과 저장
+            output_file = file_manager.update_version(policy_file)
+            policy_df.to_excel(output_file, index=False, engine='openpyxl')
+            
+            logger.info(f"미사용예외 정보가 업데이트된 파일을 '{output_file}'에 저장했습니다.")
+            logger.info(f"총 {updated_count}개의 정책에 미사용예외 정보가 업데이트되었습니다.")
+            
+            print(f"미사용예외 정보가 업데이트된 파일이 저장되었습니다: {output_file}")
+            print(f"총 {updated_count}개의 정책에 미사용예외 정보가 업데이트되었습니다.")
+            
+            return True
+        
+        except Exception as e:
+            logger.exception(f"미사용예외 정보 업데이트 중 오류 발생: {e}")
+            return False
