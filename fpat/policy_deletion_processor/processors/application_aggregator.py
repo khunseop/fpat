@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-GSAMS에서 전달받은 신청 정보를 취합하는 모듈
+GSAMS에서 전달받은 신청 정보를 표준 포맷으로 가공하는 모듈
 """
 
 import logging
@@ -13,10 +13,10 @@ from .base_processor import BaseProcessor
 logger = logging.getLogger(__name__)
 
 class ApplicationAggregator(BaseProcessor):
-    """신청 정보를 취합하는 클래스"""
+    """신청 정보를 가공하는 클래스"""
     
     def run(self, file_manager, **kwargs):
-        """신청 정보를 수집합니다."""
+        """신청 정보를 가공합니다."""
         return self.collect_applications(file_manager)
     
     def format_date(self, date):
