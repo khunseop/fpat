@@ -73,11 +73,30 @@ def workflow_wizard():
     pipeline = Pipeline(config, file_manager, excel_manager)
     
     if mode == "1":
-        # 전체 자동 공정 시나리오
-        pipeline.add_step(0, vendor=vendor, pri_info=pri_info, sec_info=sec_info) # 추출/병합
-        pipeline.add_step(15, vendor=vendor) # 중복 분석
-        pipeline.add_step(1) # 신청번호 파싱
-        # 필요시 추가 단계 등록
+        # 전체 자동 공정 시나리오: 추출 -> 병합 -> 중복분석 -> 파싱 -> 예외처리 -> 미사용반영
+        print("\n[!] 전체 자동 공정 시나리오를 구성합니다.")
+        
+        # 1. 데이터 수집 및 HA 병합 (Task 0)
+        pipeline.add_step(0, vendor=vendor, pri_info=pri_info, sec_info=sec_info)
+        
+        # 2. 중복 정책 분석 (Task 15)
+        pipeline.add_step(15, vendor=vendor)
+        
+        # 3. 신청번호 파싱 (Task 1)
+        pipeline.add_step(1)
+        
+        # 4. 벤더별 기본 예외처리 (Task 6 or 7)
+        # 인프라/차단/신규정책 등을 마킹하여 분석 효율을 높입니다.
+        if vendor == 'paloalto':
+            pipeline.add_step(6)
+        else:
+            pipeline.add_step(7)
+            
+        # 5. 미사용 정보 반영 (Task 11)
+        # 병합된 사용이력을 메인 정책 파일에 업데이트합니다.
+        pipeline.add_step(11)
+        
+        print(f"-> 파이프라인 구성 완료: Task 0, 15, 1, {'6' if vendor=='paloalto' else '7'}, 11")
         
     elif mode == "2":
         pipeline.add_step(0, vendor=vendor, pri_info=pri_info, sec_info=sec_info)
