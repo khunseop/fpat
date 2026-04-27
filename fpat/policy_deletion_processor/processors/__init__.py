@@ -17,6 +17,8 @@ from .merge_hitcount import MergeHitcount
 from .policy_usage_processor import PolicyUsageProcessor
 from .notification_classifier import NotificationClassifier
 from .auto_renewal_checker import AutoRenewalChecker
+from .auto_collector import AutoCollector
+from .redundancy_processor import RedundancyProcessor
 
 __all__ = [
     'BaseProcessor',
@@ -30,5 +32,7 @@ __all__ = [
     'MergeHitcount',
     'PolicyUsageProcessor',
     'NotificationClassifier',
-    'AutoRenewalChecker'
+    'AutoRenewalChecker',
+    'AutoCollector',
+    'RedundancyProcessor'
 ]
