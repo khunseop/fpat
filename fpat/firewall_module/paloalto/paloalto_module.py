@@ -799,9 +799,10 @@ class PaloAltoAPI:
                                 continue
                             if not parsing_started: continue
                             
-                            # 기본 정책 라인은 수집에서 제외하고 계속 진행
+                            # 종료 조건 개선: 기본 정책 발견 시 파싱 중단
                             if 'intrazone-default' in line or 'interzone-default' in line:
-                                continue
+                                parsing_started = False
+                                break
 
                             match = re.match(r'^([a-zA-Z0-9/._-]+)\s+(\d+)\s+([A-Za-z]{3}\s+[A-Za-z]{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\d{4}|-)', line)
                             if match:
