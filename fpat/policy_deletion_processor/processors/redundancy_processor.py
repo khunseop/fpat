@@ -60,7 +60,14 @@ class RedundancyProcessor(BaseProcessor):
                 logger.warning("중복 정책이 발견되지 않았습니다.")
                 return True
                 
-            # 4. 결과 저장 (파일명 규칙 적용)
+            # 4. 분석용 임시 컬럼 제거 (Extracted Source/Destination/Service)
+            cols_to_drop = ['Extracted Source', 'Extracted Destination', 'Extracted Service']
+            existing_drops = [c for c in cols_to_drop if c in result_df.columns]
+            if existing_drops:
+                result_df.drop(columns=existing_drops, inplace=True)
+                logger.info(f"분석용 임시 컬럼을 제거했습니다: {existing_drops}")
+
+            # 5. 결과 저장 (파일명 규칙 적용)
             today = datetime.now().strftime('%Y-%m-%d')
             # 입력 파일명에서 IP 추출 시도 (예: 2026-04-27_1.1.1.1_policy.xlsx)
             filename = os.path.basename(input_file)
