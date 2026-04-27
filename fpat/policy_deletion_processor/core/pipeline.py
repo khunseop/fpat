@@ -12,7 +12,7 @@ from ..processors import (
     RequestParser, RequestExtractor, MisIdAdder, ApplicationAggregator,
     RequestInfoAdder, ExceptionHandler, DuplicatePolicyClassifier,
     MergeHitcount, PolicyUsageProcessor, NotificationClassifier,
-    AutoRenewalChecker
+    AutoRenewalChecker, AutoCollector, RedundancyProcessor
 )
 
 logger = logging.getLogger(__name__)
@@ -24,6 +24,7 @@ class TaskRegistry:
     def get_processor_info(task_id: int) -> Optional[Dict[str, Any]]:
         """작업 번호에 해당하는 프로세서 클래스와 기본 인자를 반환합니다."""
         registry = {
+            0: {"class": AutoCollector, "kwargs": {}},
             1: {"class": RequestParser, "kwargs": {}},
             2: {"class": RequestExtractor, "kwargs": {}},
             3: {"class": MisIdAdder, "kwargs": {}},
@@ -37,7 +38,8 @@ class TaskRegistry:
             11: {"class": PolicyUsageProcessor, "kwargs": {"mode": "add"}},
             12: {"class": PolicyUsageProcessor, "kwargs": {"mode": "update"}},
             13: {"class": NotificationClassifier, "kwargs": {}},
-            14: {"class": AutoRenewalChecker, "kwargs": {}}
+            14: {"class": AutoRenewalChecker, "kwargs": {}},
+            15: {"class": RedundancyProcessor, "kwargs": {}}
         }
         return registry.get(task_id)
 
