@@ -46,30 +46,40 @@ def workflow_wizard():
     clear_screen()
     print_banner()
     
-    print("\n[단계 1] 방화벽 데이터 수집 설정")
+    print("\n[단계 1] 워크플로우 실행 모드 선택")
     print("-" * 30)
-    vendor = get_input("방화벽 벤더 (paloalto/ngf/mf2)", "paloalto")
-    
-    pri_ip = get_input("Primary 장비 IP/Hostname")
-    user = get_input("접속 계정", "admin")
-    pw = getpass.getpass("접속 비밀번호: ")
-    
-    pri_info = {"hostname": pri_ip, "username": user, "password": pw}
-    
-    has_ha = get_input("HA 구성(Secondary 장비)이 있습니까? (y/n)", "y").lower() == 'y'
-    sec_info = None
-    if has_ha:
-        sec_ip = get_input("Secondary 장비 IP/Hostname")
-        sec_info = {"hostname": sec_ip, "username": user, "password": pw}
-    
-    print("\n[단계 2] 워크플로우 실행 모드 선택")
-    print("-" * 30)
-    print("1. 전체 자동 공정 (추출 -> 병합 -> 중복분석 -> 기본 예외처리)")
+    print("1. 전체 자동 공정 (추출 -> 파싱(정책) -> 중복분석 -> 파싱(결과))")
     print("2. 데이터 추출 및 병합만 수행 (Task 0)")
     print("3. 기존 파일을 이용한 분석 파이프라인 실행 (Task 1-15)")
     
     mode = get_input("선택", "1")
     
+    # 설정 초기화
+    vendor = "paloalto"
+    pri_info = None
+    sec_info = None
+    
+    # 장비 접속이 필요한 경우에만 정보 입력받음
+    if mode in ["1", "2"]:
+        print("\n[단계 2] 방화벽 데이터 수집 설정")
+        print("-" * 30)
+        vendor = get_input("방화벽 벤더 (paloalto/ngf/mf2)", "paloalto")
+        
+        pri_ip = get_input("Primary 장비 IP/Hostname")
+        user = get_input("접속 계정", "admin")
+        pw = getpass.getpass("접속 비밀번호: ")
+        pri_info = {"hostname": pri_ip, "username": user, "password": pw}
+        
+        has_ha = get_input("HA 구성(Secondary 장비)이 있습니까? (y/n)", "y").lower() == 'y'
+        if has_ha:
+            sec_ip = get_input("Secondary 장비 IP/Hostname")
+            sec_info = {"hostname": sec_ip, "username": user, "password": pw}
+    else:
+        # 모드 3인 경우 분석 로직을 위해 벤더 정보만 확인
+        print("\n[단계 2] 분석 대상 장비 정보")
+        print("-" * 30)
+        vendor = get_input("대상 방화벽 벤더 (paloalto/ngf/mf2)", "paloalto")
+
     pipeline = Pipeline(config, file_manager, excel_manager)
     
     if mode == "1":
@@ -83,11 +93,9 @@ def workflow_wizard():
         pipeline.add_step(1)
         
         # 3. 중복 정책 분석 (Task 15)
-        # 위 단계에서 파싱된 정책 파일을 기반으로 분석 수행
         pipeline.add_step(15, vendor=vendor)
         
         # 4. 중복 분석 결과 파일 신청 정보 파싱 (Task 1)
-        # 생성된 redundancy 파일에 대해서도 파싱 수행
         pipeline.add_step(1)
         
         print("-> 파이프라인 구성 완료: Task 0(수집), Task 1(정책파싱), Task 15(중복분석), Task 1(결과파싱)")
@@ -97,12 +105,17 @@ def workflow_wizard():
         
     elif mode == "3":
         print("\n실행할 태스크 번호를 공백으로 구분하여 입력하세요.")
-        print("예: 1 2 5 8 11 (파싱, 추출, 매칭, 중복분류, 미사용반영)")
+        print("번호 안내: 1(파싱), 6/7(예외마킹), 10(병합), 11/12(사용반영), 15(중복분석)")
         task_input = get_input("태스크 번호")
         if task_input:
             tasks = task_input.split()
             for t in tasks:
-                pipeline.add_step(int(t))
+                t_idx = int(t)
+                # 중복 분석(15)의 경우 입력받은 vendor 정보 전달
+                if t_idx == 15:
+                    pipeline.add_step(t_idx, vendor=vendor)
+                else:
+                    pipeline.add_step(t_idx)
         else:
             print("태스크 번호가 입력되지 않았습니다.")
             return
