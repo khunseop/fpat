@@ -146,8 +146,12 @@ class RequestParser(BaseProcessor):
             bool: 성공 여부
         """
         try:
-            print("정책 파일을 선택하세요:")
+            # 파일이 이미 지정되어 있는지 확인 (큐에서 가로챔)
             file_name = file_manager.select_files()
+            if not file_name:
+                print("정책 파일을 선택하세요:")
+                file_name = file_manager.select_files()
+                
             if not file_name:
                 return False
             
@@ -155,8 +159,14 @@ class RequestParser(BaseProcessor):
             
             total = len(df)
             for index, row in df.iterrows():
-                print(f"\r신청 정보 파싱 중: {index + 1}/{total}", end='', flush=True)
-                result = self.parse_request_info(row['Rule Name'], row['Description'])
+                if index % max(1, total // 10) == 0 or index == total - 1:
+                    print(f"\r신청 정보 파싱 중: {index + 1}/{total}", end='', flush=True)
+                
+                # Rule Name과 Description 컬럼이 있는지 확인
+                rule_name = row.get('Rule Name', '')
+                description = row.get('Description', '')
+                
+                result = self.parse_request_info(rule_name, description)
                 for key, value in result.items():
                     df.at[index, key] = value
             
@@ -165,6 +175,9 @@ class RequestParser(BaseProcessor):
             new_file_name = file_manager.update_version(file_name)
             df.to_excel(new_file_name, index=False)
             logger.info(f"신청 유형 파싱 결과를 '{new_file_name}'에 저장했습니다.")
+            
+            # [개선] 결과 파일을 대기열에 넣어 다음 태스크가 바로 사용할 수 있게 함
+            file_manager.set_forced_files([new_file_name])
             return True
         except Exception as e:
             logger.exception(f"신청 유형 파싱 중 오류 발생: {e}")

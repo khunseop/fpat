@@ -73,18 +73,24 @@ def workflow_wizard():
     pipeline = Pipeline(config, file_manager, excel_manager)
     
     if mode == "1":
-        # 전체 자동 공정 시나리오: 추출 -> 병합 -> 중복분석
+        # 전체 자동 공정 시나리오: 추출 -> 파싱(정책) -> 중복분석 -> 파싱(분석결과)
         print("\n[!] 자동 수집 및 중복 분석 공정을 구성합니다.")
         
         # 1. 데이터 수집 및 HA 병합 (Task 0)
-        # Primary(All) + Secondary(Usage) 병렬 추출 후 병합 수행
         pipeline.add_step(0, vendor=vendor, pri_info=pri_info, sec_info=sec_info)
         
-        # 2. 중복 정책 분석 (Task 15)
-        # 추출된 Full Data를 기반으로 중복 및 가려진 정책 분석
+        # 2. 정책 파일 신청 정보 파싱 (Task 1)
+        pipeline.add_step(1)
+        
+        # 3. 중복 정책 분석 (Task 15)
+        # 위 단계에서 파싱된 정책 파일을 기반으로 분석 수행
         pipeline.add_step(15, vendor=vendor)
         
-        print("-> 파이프라인 구성 완료: Task 0 (수집/병합), Task 15 (중복분석)")
+        # 4. 중복 분석 결과 파일 신청 정보 파싱 (Task 1)
+        # 생성된 redundancy 파일에 대해서도 파싱 수행
+        pipeline.add_step(1)
+        
+        print("-> 파이프라인 구성 완료: Task 0(수집), Task 1(정책파싱), Task 15(중복분석), Task 1(결과파싱)")
         
     elif mode == "2":
         pipeline.add_step(0, vendor=vendor, pri_info=pri_info, sec_info=sec_info)

@@ -73,6 +73,8 @@ class RedundancyProcessor(BaseProcessor):
             logger.info(f"중복 분석 완료: {len(result_df)}개 항목 발견. 저장: {output_file}")
             print(f"중복 분석 결과가 '{output_file}'에 저장되었습니다.")
             
+            # [개선] 생성된 중복 분석 결과 파일을 대기열에 넣어 다음 태스크(파싱)에서 사용할 수 있게 함
+            file_manager.set_forced_files([output_file])
             return True
 
         except Exception as e:
