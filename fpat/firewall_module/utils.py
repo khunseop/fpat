@@ -283,8 +283,9 @@ def memory_efficient_excel_writer(data_dict: dict, output_path: str, chunk_size:
                 logger.info(f"시트 '{sheet_name}' 청크 단위 작성 시작 ({len(df)}개 레코드)")
                 
                 for i, chunk in enumerate(chunk_dataframe(df, chunk_size)):
-                    start_row = i * chunk_size if i > 0 else 0
-                    header = i == 0  # 첫 번째 청크만 헤더 포함
+                    # 첫 번째 청크는 0행부터(헤더 포함), 이후 청크는 (i * chunk_size + 1)행부터(헤더 제외)
+                    start_row = i * chunk_size + (1 if i > 0 else 0)
+                    header = i == 0
                     
                     chunk.to_excel(
                         writer, 
