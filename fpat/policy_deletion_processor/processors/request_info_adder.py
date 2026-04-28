@@ -158,8 +158,11 @@ class RequestInfoAdder(BaseProcessor):
             
             new_file_name = file_manager.update_version(rule_file)
             rule_df.to_excel(new_file_name, index=False)
-            logger.info(f"신청 정보 추가 결과를 '{new_file_name}'에 저장했습니다.")
-            print(f"신청 정보 추가 결과가 '{new_file_name}'에 저장되었습니다.")
+            logger.info(f"신청 정보 매핑 결과를 '{new_file_name}'에 저장했습니다.")
+            print(f"신청 정보 매핑 결과가 '{new_file_name}'에 저장되었습니다.")
+            
+            # [개선] 결과 파일을 대기열에 등록하여 다음 단계(Task 14 등)에서 사용 가능하게 함
+            file_manager.set_forced_files([new_file_name])
             return True
         except Exception as e:
             logger.exception(f"신청 정보 추가 중 오류 발생: {e}")

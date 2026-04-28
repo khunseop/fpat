@@ -138,23 +138,36 @@ class ApplicationAggregator(BaseProcessor):
 
     def collect_applications(self, file_manager):
         """
-        신청 정보를 수집하는 함수
-        
+        신청 정보를 가공하는 함수
+
         Args:
             file_manager: 파일 관리자
-            
+
         Returns:
             bool: 성공 여부
         """
         try:
-            print("신청정보 파일을 선택하세요:")
+            # 1. 파일 선택 (강제 지정된 파일이 있으면 우선 사용)
             file_name = file_manager.select_files()
+            if not file_name:
+                print("가공할 신청정보 원본 파일(GSAMS 추출물)을 선택하세요:")
+                file_name = file_manager.select_files()
+
             if not file_name:
                 return False
 
-            self.process_applications(file_name, f"Conv_{file_name}")
+            # 2. 결과 파일명 결정 (표준 포맷)
+            from datetime import datetime
+            today = datetime.now().strftime('%Y-%m-%d')
+            output_file = os.path.join("outputs", f"{today}_gsams_conv.xlsx")
 
+            # 3. 가공 프로세스 실행
+            self.process_applications(file_name, output_file)
+
+            # 4. 다음 단계를 위해 결과 등록
+            file_manager.set_forced_files([output_file])
             return True
         except Exception as e:
-            logger.exception(f"Merge 중 오류 발생: {e}")
-            return False 
+            logger.exception(f"신청정보 가공 중 오류 발생: {e}")
+            return False
+ 
