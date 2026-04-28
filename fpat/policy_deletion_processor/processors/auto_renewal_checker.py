@@ -55,14 +55,22 @@ class AutoRenewalChecker(BaseProcessor):
             logger.exception(f"자동 연장 체크 실행 중 오류 발생: {e}")
             return False
 
+    def _safe_to_datetime(self, val):
+        """날짜 형식을 안전하게 변환합니다."""
+        if pd.isna(val) or val == "" or str(val).strip() == "1900-01-01":
+            return pd.Timestamp("1900-01-01")
+        try:
+            return pd.to_datetime(val)
+        except:
+            return pd.Timestamp("1900-01-01")
+
     def _analyze_chains(self, df):
         """신청정보에서 연장 체인 분석"""
-        # 필수 컬럼 확인 (정규화된 이름으로 체크)
+        # 필수 컬럼 확인
         required = ['REQUEST_ID', 'TITLE', 'REQUEST_START_DATE', 'REQUEST_END_DATE']
         missing = [c for c in required if c not in df.columns]
         if missing:
             logger.error(f"가공 신청정보 파일에 필수 컬럼이 누락되었습니다: {missing}")
-            print(f"오류: 신청정보 파일에 {missing} 컬럼이 없습니다. 현재 컬럼: {list(df.columns)}")
             return None
 
         # ID와 시작일 기준으로 정렬하여 다음 신청건 매핑
@@ -78,43 +86,43 @@ class AutoRenewalChecker(BaseProcessor):
             missing = [c for c in required_cols if c not in policy_df.columns]
             if missing:
                 logger.error(f"정책 파일에 필수 컬럼이 누락되었습니다: {missing}")
-                print(f"오류: 정책 파일에 {missing} 컬럼이 없습니다. 현재 컬럼: {list(policy_df.columns)}")
                 return False
 
             # 매핑용 딕셔너리 구축 (renew_df 활용)
-            # Lookup 1: (ID + TITLE) -> TITLE_next_clean
             renew_df['key1'] = renew_df['REQUEST_ID'].astype(str) + renew_df['TITLE'].astype(str)
-            lookup_next_title = renew_df.set_index('key1')['TITLE_next_clean'].to_dict()
+            
+            # 딕셔너리 변환 시 오류 방지를 위해 중복 제거 (정렬 순서에 따라 마지막 것이 남음)
+            renew_clean = renew_df.drop_duplicates('key1', keep='last')
+            
+            # Lookup 1: (ID + TITLE) -> TITLE_next_clean
+            lookup_next_title = renew_clean.set_index('key1')['TITLE_next_clean'].to_dict()
 
-            # Lookup 2: (ID + TITLE_next_clean) -> (START_next, END_next)
-            # Key2는 (ID + TITLE)과 매칭되어야 하므로 renew_df의 원본 컬럼 사용
-            lookup_next_dates = renew_df.set_index('key1')[['REQUEST_START_DATE', 'REQUEST_END_DATE']].to_dict('index')
+            # Lookup 2: (ID + TITLE) -> (START, END) 
+            lookup_next_dates = renew_clean.set_index('key1')[['REQUEST_START_DATE', 'REQUEST_END_DATE']].to_dict('index')
 
             updated_count = 0
-            total = len(v3_df)
+            total = len(policy_df)
 
             logger.info("날짜 비교 및 업데이트 시작...")
-            for idx, row in v3_df.iterrows():
+            for idx, row in policy_df.iterrows():
                 print(f"\r처리 중: {idx + 1}/{total}", end='', flush=True)
                 
                 req_id = str(row['REQUEST_ID'])
                 title = str(row['TITLE'])
+                key_current = req_id + title
                 
-                # 1. 현재 v3의 정책이 분석 리스트에 있는지 확인 (ID + TITLE)
-                key_v3 = req_id + title
-                next_title = lookup_next_title.get(key_v3)
-                
+                # 1. 현재 정책의 다음 버전(TITLE)이 있는지 확인
+                next_title = lookup_next_title.get(key_current)
                 if pd.isna(next_title) or not next_title:
                     continue
                 
-                # 2. 다음 버전(next_title)의 날짜 정보를 분석 리스트에서 가져옴
+                # 2. 다음 버전의 날짜 정보를 가져옴
                 key_next = req_id + str(next_title)
                 next_info = lookup_next_dates.get(key_next)
-                
                 if not next_info:
                     continue
 
-                # 날짜 객체 변환
+                # 날짜 비교 로직
                 curr_req_start = self._safe_to_datetime(row['REQUEST_START_DATE'])
                 curr_req_end = self._safe_to_datetime(row['REQUEST_END_DATE'])
                 curr_base_start = self._safe_to_datetime(row['Start Date'])
@@ -125,14 +133,14 @@ class AutoRenewalChecker(BaseProcessor):
 
                 is_updated = False
                 
-                # 시작일 업데이트 조건: 신규값이 기존 REQUEST_START_DATE와 Start Date보다 모두 클 때
+                # 시작일 업데이트 조건
                 if new_start > curr_req_start and new_start > curr_base_start:
-                    v3_df.at[idx, 'REQUEST_START_DATE'] = new_start.strftime('%Y-%m-%d')
+                    policy_df.at[idx, 'REQUEST_START_DATE'] = new_start.strftime('%Y-%m-%d')
                     is_updated = True
                 
-                # 종료일 업데이트 조건: 신규값이 기존 REQUEST_END_DATE와 End Date보다 모두 클 때
+                # 종료일 업데이트 조건
                 if new_end > curr_req_end and new_end > curr_base_end:
-                    v3_df.at[idx, 'REQUEST_END_DATE'] = new_end.strftime('%Y-%m-%d')
+                    policy_df.at[idx, 'REQUEST_END_DATE'] = new_end.strftime('%Y-%m-%d')
                     is_updated = True
                 
                 if is_updated:
@@ -140,9 +148,9 @@ class AutoRenewalChecker(BaseProcessor):
 
             print()
             
-            # 최종 결과 저장
-            new_file_name = file_manager.update_version(v3_file)
-            v3_df.to_excel(new_file_name, index=False)
+            # 결과 저장
+            new_file_name = file_manager.update_version(policy_file)
+            policy_df.to_excel(new_file_name, index=False)
             
             logger.info(f"업데이트 완료: 총 {updated_count}건의 날짜 정보 최신화.")
             print(f"최종 결과가 저장되었습니다: {new_file_name}")
