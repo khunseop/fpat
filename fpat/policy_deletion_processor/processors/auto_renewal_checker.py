@@ -17,34 +17,39 @@ class AutoRenewalChecker(BaseProcessor):
     """자동 연장 정책 분석 및 날짜 업데이트 클래스"""
     
     def run(self, file_manager, **kwargs):
-        """1단계: 정책 매핑 파일(v3) 선택 -> 2단계: 가공된 신청정보(conv) 선택 -> 분석 및 업데이트 수행"""
+        """1단계: 정책 파일 선택 -> 2단계: 가공된 신청정보(conv) 선택 -> 분석 및 업데이트 수행"""
         try:
             print("\n[!] 자동 연장 날짜 업데이트 작업을 시작합니다.")
             
-            # 1. 메인 업데이트 대상 파일(v3) 선택
-            v3_file = file_manager.select_files()
-            if not v3_file:
-                print("업데이트할 정책 매핑 결과 파일(v3, 보통 Task 5 결과물)을 선택하세요:")
-                v3_file = file_manager.select_files()
-            if not v3_file: return False
+            # 1. 메인 업데이트 대상 파일(정책 파일) 선택
+            target_file = file_manager.select_files()
+            if not target_file:
+                print("\n[선택] 업데이트를 반영할 '분석 대상 정책 파일'을 선택하세요 (예: Task 5 결과물):")
+                target_file = file_manager.select_files()
+            if not target_file: return False
 
             # 2. 참조용 가공 신청정보(conv) 선택
-            conv_file = file_manager.select_files()
-            if not conv_file:
-                print("참조할 가공된 신청정보 파일(conv, 보통 Task 4 결과물)을 선택하세요:")
-                conv_file = file_manager.select_files()
-            if not conv_file: return False
+            reference_file = file_manager.select_files()
+            if not reference_file:
+                print("\n[선택] 자동연장 확인을 위한 '가공된 신청정보 파일'을 선택하세요 (예: Task 4 결과물):")
+                reference_file = file_manager.select_files()
+            if not reference_file: return False
 
-            logger.info(f"데이터 로드: v3={v3_file}, conv={conv_file}")
-            v3_df = pd.read_excel(v3_file)
-            conv_df = pd.read_excel(conv_file)
+            logger.info(f"데이터 로드: 정책={target_file}, 신청정보={reference_file}")
+            
+            # 엑셀 로드 및 컬럼명 정규화 (공백 제거)
+            policy_df = pd.read_excel(target_file)
+            policy_df.columns = [c.strip() for c in policy_df.columns]
+            
+            conv_df = pd.read_excel(reference_file)
+            conv_df.columns = [c.strip() for c in conv_df.columns]
 
-            # 분석(create_renew_map의 로직) 수행
+            # 분석(연장 체인 확인) 수행
             renew_df = self._analyze_chains(conv_df)
             if renew_df is None: return False
             
             # 업데이트 수행
-            return self.update_renewal_dates(file_manager, v3_file, v3_df, renew_df)
+            return self.update_renewal_dates(file_manager, target_file, policy_df, renew_df)
             
         except Exception as e:
             logger.exception(f"자동 연장 체크 실행 중 오류 발생: {e}")
@@ -52,10 +57,12 @@ class AutoRenewalChecker(BaseProcessor):
 
     def _analyze_chains(self, df):
         """신청정보에서 연장 체인 분석"""
-        # 필수 컬럼 확인
+        # 필수 컬럼 확인 (정규화된 이름으로 체크)
         required = ['REQUEST_ID', 'TITLE', 'REQUEST_START_DATE', 'REQUEST_END_DATE']
-        if not all(c in df.columns for c in required):
-            logger.error(f"가공 신청정보 파일에 필수 컬럼이 누락되었습니다: {required}")
+        missing = [c for c in required if c not in df.columns]
+        if missing:
+            logger.error(f"가공 신청정보 파일에 필수 컬럼이 누락되었습니다: {missing}")
+            print(f"오류: 신청정보 파일에 {missing} 컬럼이 없습니다. 현재 컬럼: {list(df.columns)}")
             return None
 
         # ID와 시작일 기준으로 정렬하여 다음 신청건 매핑
@@ -63,13 +70,15 @@ class AutoRenewalChecker(BaseProcessor):
         df['TITLE_next_clean'] = df.groupby('REQUEST_ID')['TITLE'].shift(-1)
         return df
 
-    def update_renewal_dates(self, file_manager, v3_file, v3_df, renew_df):
-        """v3 파일에 분석된 날짜 반영"""
+    def update_renewal_dates(self, file_manager, policy_file, policy_df, renew_df):
+        """정책 파일에 분석된 날짜 반영"""
         try:
             # 필요한 컬럼 존재 확인
-            required_v3 = ['REQUEST_ID', 'TITLE', 'REQUEST_START_DATE', 'REQUEST_END_DATE', 'Start Date', 'End Date']
-            if not all(c in v3_df.columns for c in required_v3):
-                logger.error(f"v3 파일에 필수 컬럼이 누락되었습니다: {required_v3}")
+            required_cols = ['REQUEST_ID', 'TITLE', 'REQUEST_START_DATE', 'REQUEST_END_DATE', 'Start Date', 'End Date']
+            missing = [c for c in required_cols if c not in policy_df.columns]
+            if missing:
+                logger.error(f"정책 파일에 필수 컬럼이 누락되었습니다: {missing}")
+                print(f"오류: 정책 파일에 {missing} 컬럼이 없습니다. 현재 컬럼: {list(policy_df.columns)}")
                 return False
 
             # 매핑용 딕셔너리 구축 (renew_df 활용)
