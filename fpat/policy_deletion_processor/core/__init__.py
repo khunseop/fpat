@@ -5,7 +5,5 @@
 방화벽 정책 관리 프로세스의 핵심 모듈 패키지
 """
 
-from .config_manager import ConfigManager
-from .pipeline import Pipeline, TaskRegistry
-
-__all__ = ['ConfigManager', 'Pipeline', 'TaskRegistry']
+# 순환 참조 방지를 위해 패키지 수준의 임포트를 제거합니다.
+# 필요한 모듈은 개별 파일에서 직접 임포트하여 사용하세요.

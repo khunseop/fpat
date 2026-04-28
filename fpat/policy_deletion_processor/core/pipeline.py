@@ -7,20 +7,6 @@
 
 import logging
 from typing import List, Dict, Any, Type, Optional
-from fpat.policy_deletion_processor.processors.base_processor import BaseProcessor
-from fpat.policy_deletion_processor.processors.request_parser import RequestParser
-from fpat.policy_deletion_processor.processors.request_extractor import RequestExtractor
-from fpat.policy_deletion_processor.processors.mis_id_adder import MisIdAdder
-from fpat.policy_deletion_processor.processors.application_aggregator import ApplicationAggregator
-from fpat.policy_deletion_processor.processors.request_info_adder import RequestInfoAdder
-from fpat.policy_deletion_processor.processors.exception_handler import ExceptionHandler
-from fpat.policy_deletion_processor.processors.duplicate_policy_classifier import DuplicatePolicyClassifier
-from fpat.policy_deletion_processor.processors.merge_hitcount import MergeHitcount
-from fpat.policy_deletion_processor.processors.policy_usage_processor import PolicyUsageProcessor
-from fpat.policy_deletion_processor.processors.notification_classifier import NotificationClassifier
-from fpat.policy_deletion_processor.processors.auto_renewal_checker import AutoRenewalChecker
-from fpat.policy_deletion_processor.processors.auto_collector import AutoCollector
-from fpat.policy_deletion_processor.processors.redundancy_processor import RedundancyProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +15,24 @@ class TaskRegistry:
     
     @staticmethod
     def get_processor_info(task_id: int) -> Optional[Dict[str, Any]]:
-        """작업 번호에 해당하는 프로세서 클래스와 기본 인자를 반환합니다."""
+        """
+        작업 번호에 해당하는 프로세서 클래스와 기본 인자를 반환합니다.
+        순환 참조 방지를 위해 메서드 내부에서 로컬 임포트를 수행합니다.
+        """
+        from fpat.policy_deletion_processor.processors.request_parser import RequestParser
+        from fpat.policy_deletion_processor.processors.request_extractor import RequestExtractor
+        from fpat.policy_deletion_processor.processors.mis_id_adder import MisIdAdder
+        from fpat.policy_deletion_processor.processors.application_aggregator import ApplicationAggregator
+        from fpat.policy_deletion_processor.processors.request_info_adder import RequestInfoAdder
+        from fpat.policy_deletion_processor.processors.exception_handler import ExceptionHandler
+        from fpat.policy_deletion_processor.processors.duplicate_policy_classifier import DuplicatePolicyClassifier
+        from fpat.policy_deletion_processor.processors.merge_hitcount import MergeHitcount
+        from fpat.policy_deletion_processor.processors.policy_usage_processor import PolicyUsageProcessor
+        from fpat.policy_deletion_processor.processors.notification_classifier import NotificationClassifier
+        from fpat.policy_deletion_processor.processors.auto_renewal_checker import AutoRenewalChecker
+        from fpat.policy_deletion_processor.processors.auto_collector import AutoCollector
+        from fpat.policy_deletion_processor.processors.redundancy_processor import RedundancyProcessor
+
         registry = {
             0: {"class": AutoCollector, "kwargs": {}},
             1: {"class": RequestParser, "kwargs": {}},
@@ -68,6 +71,7 @@ class Pipeline:
             kwargs.update(custom_kwargs)
             
             # excel_manager가 필요한 프로세서에 대해 주입
+            from fpat.policy_deletion_processor.processors.notification_classifier import NotificationClassifier
             if processor_class == NotificationClassifier:
                 kwargs["excel_manager"] = self.excel_manager
                 
