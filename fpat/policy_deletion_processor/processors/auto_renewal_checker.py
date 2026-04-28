@@ -9,7 +9,7 @@ import logging
 import pandas as pd
 import os
 from datetime import datetime
-from .base_processor import BaseProcessor
+from fpat.policy_deletion_processor.processors.base_processor import BaseProcessor
 
 logger = logging.getLogger(__name__)
 

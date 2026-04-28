@@ -5,34 +5,5 @@
 방화벽 정책 관리 프로세스의 데이터 처리 모듈 패키지
 """
 
-from .base_processor import BaseProcessor
-from .request_parser import RequestParser
-from .request_extractor import RequestExtractor  
-from .mis_id_adder import MisIdAdder
-from .application_aggregator import ApplicationAggregator
-from .request_info_adder import RequestInfoAdder
-from .exception_handler import ExceptionHandler
-from .duplicate_policy_classifier import DuplicatePolicyClassifier
-from .merge_hitcount import MergeHitcount
-from .policy_usage_processor import PolicyUsageProcessor
-from .notification_classifier import NotificationClassifier
-from .auto_renewal_checker import AutoRenewalChecker
-from .auto_collector import AutoCollector
-from .redundancy_processor import RedundancyProcessor
-
-__all__ = [
-    'BaseProcessor',
-    'RequestParser',
-    'RequestExtractor',
-    'MisIdAdder', 
-    'ApplicationAggregator',
-    'RequestInfoAdder',
-    'ExceptionHandler',
-    'DuplicatePolicyClassifier',
-    'MergeHitcount',
-    'PolicyUsageProcessor',
-    'NotificationClassifier',
-    'AutoRenewalChecker',
-    'AutoCollector',
-    'RedundancyProcessor'
-]
+# 순환 참조 방지를 위해 패키지 수준의 임포트를 제거합니다.
+# Pipeline에서 개별 모듈을 직접 임포트하여 사용합니다.
