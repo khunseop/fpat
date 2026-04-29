@@ -31,8 +31,9 @@ class TaskRegistry:
             from fpat.policy_deletion_processor.processors.policy_usage_processor import PolicyUsageProcessor
             from fpat.policy_deletion_processor.processors.notification_classifier import NotificationClassifier
             from fpat.policy_deletion_processor.processors.auto_renewal_checker import AutoRenewalChecker
-            from fpat.policy_deletion_processor.processors.auto_collector import AutoCollector
-            from fpat.policy_deletion_processor.processors.redundancy_processor import RedundancyProcessor
+            from fpat.policy_deletion_processor.processors.exception_handler import ExceptionHandler
+            from fpat.policy_deletion_processor.processors.bottom_latest_policy_validator import BottomLatestPolicyValidator
+            from fpat.policy_deletion_processor.processors.duplicate_policy_classifier import DuplicatePolicyClassifier
 
             registry = {
                 0: {"class": AutoCollector, "kwargs": {}},
@@ -43,15 +44,17 @@ class TaskRegistry:
                 5: {"class": RequestInfoAdder, "kwargs": {}},
                 6: {"class": ExceptionHandler, "kwargs": {"vendor": "paloalto"}},
                 7: {"class": ExceptionHandler, "kwargs": {"vendor": "secui"}},
-                8: {"class": DuplicatePolicyClassifier, "kwargs": {"mode": "classify"}},
-                9: {"class": DuplicatePolicyClassifier, "kwargs": {"mode": "update"}},
-                10: {"class": MergeHitcount, "kwargs": {}},
-                11: {"class": PolicyUsageProcessor, "kwargs": {"mode": "add"}},
-                12: {"class": PolicyUsageProcessor, "kwargs": {"mode": "update"}},
-                13: {"class": NotificationClassifier, "kwargs": {}},
+                8: {"class": BottomLatestPolicyValidator, "kwargs": {}},
+                9: {"class": DuplicatePolicyClassifier, "kwargs": {"mode": "classify"}},
+                10: {"class": DuplicatePolicyClassifier, "kwargs": {"mode": "update"}},
+                11: {"class": MergeHitcount, "kwargs": {}},
+                12: {"class": PolicyUsageProcessor, "kwargs": {"mode": "add"}},
+                13: {"class": PolicyUsageProcessor, "kwargs": {"mode": "update"}},
                 14: {"class": AutoRenewalChecker, "kwargs": {}},
-                15: {"class": RedundancyProcessor, "kwargs": {}}
+                15: {"class": NotificationClassifier, "kwargs": {}},
+                16: {"class": RedundancyProcessor, "kwargs": {}}
             }
+
             return registry.get(task_id)
         except ImportError as e:
             import logging
