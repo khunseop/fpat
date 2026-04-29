@@ -2,21 +2,37 @@
 # -*- coding: utf-8 -*-
 
 """
-정책 삭제 프로세스용 파이프라인 엔진 및 태스크 레지스트리
+정책 삭제 프로세스 통합 파이프라인
 """
 
 import logging
-from typing import List, Dict, Any, Type, Optional
+from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
-class TaskRegistry:
-    """작업 번호와 프로세서를 매핑하는 레지스트리"""
+class Pipeline:
+    """여러 프로세서를 순서대로 실행하는 파이프라인 클래스"""
     
-    @staticmethod
-    def get_processor_info(task_id: int) -> Optional[Dict[str, Any]]:
+    def __init__(self, config, file_manager, excel_manager):
+        self.config = config
+        self.file_manager = file_manager
+        self.excel_manager = excel_manager
+        self.steps = []
+
+    def add_step(self, task_id: int, **kwargs):
+        """실행할 태스크를 파이프라인에 추가"""
+        task_info = self._get_task_info(task_id)
+        if task_info:
+            # 전달받은 kwargs를 기존 설정에 병합
+            merged_kwargs = task_info.get("kwargs", {}).copy()
+            merged_kwargs.update(kwargs)
+            self.steps.append((task_info["class"], merged_kwargs))
+        else:
+            logger.error(f"알 수 없는 태스크 ID: {task_id}")
+
+    def _get_task_info(self, task_id: int) -> Optional[Dict[str, Any]]:
         """
-        작업 번호에 해당하는 프로세서 클래스와 기본 인자를 반환합니다.
+        태스크 ID에 해당하는 클래스와 기본 인자 반환.
         순환 참조 방지를 위해 메서드 내부에서 로컬 임포트를 수행합니다.
         """
         try:
@@ -26,14 +42,14 @@ class TaskRegistry:
             from fpat.policy_deletion_processor.processors.application_aggregator import ApplicationAggregator
             from fpat.policy_deletion_processor.processors.request_info_adder import RequestInfoAdder
             from fpat.policy_deletion_processor.processors.exception_handler import ExceptionHandler
+            from fpat.policy_deletion_processor.processors.bottom_latest_policy_validator import BottomLatestPolicyValidator
             from fpat.policy_deletion_processor.processors.duplicate_policy_classifier import DuplicatePolicyClassifier
             from fpat.policy_deletion_processor.processors.merge_hitcount import MergeHitcount
             from fpat.policy_deletion_processor.processors.policy_usage_processor import PolicyUsageProcessor
-            from fpat.policy_deletion_processor.processors.notification_classifier import NotificationClassifier
             from fpat.policy_deletion_processor.processors.auto_renewal_checker import AutoRenewalChecker
-            from fpat.policy_deletion_processor.processors.exception_handler import ExceptionHandler
-            from fpat.policy_deletion_processor.processors.bottom_latest_policy_validator import BottomLatestPolicyValidator
-            from fpat.policy_deletion_processor.processors.duplicate_policy_classifier import DuplicatePolicyClassifier
+            from fpat.policy_deletion_processor.processors.notification_classifier import NotificationClassifier
+            from fpat.policy_deletion_processor.processors.auto_collector import AutoCollector
+            from fpat.policy_deletion_processor.processors.redundancy_processor import RedundancyProcessor
 
             registry = {
                 0: {"class": AutoCollector, "kwargs": {}},
@@ -55,55 +71,23 @@ class TaskRegistry:
                 16: {"class": RedundancyProcessor, "kwargs": {}}
             }
 
-            return registry.get(task_id)
+            return registry.get(int(task_id))
         except ImportError as e:
-            import logging
-            logging.error(f"프로세서 로드 실패: {e}")
+            logger.error(f"프로세서 로드 실패: {e}")
             raise
 
-class Pipeline:
-    """여러 프로세서를 순차적으로 실행하는 엔진"""
-    
-    def __init__(self, config, file_manager, excel_manager=None):
-        self.config = config
-        self.file_manager = file_manager
-        self.excel_manager = excel_manager
-        self.steps: List[Dict[str, Any]] = []
-
-    def add_step(self, task_id: int, **custom_kwargs):
-        """실행할 단계를 추가합니다."""
-        info = TaskRegistry.get_processor_info(task_id)
-        if info:
-            processor_class = info["class"]
-            kwargs = info["kwargs"].copy()
-            kwargs.update(custom_kwargs)
-            
-            # excel_manager가 필요한 프로세서에 대해 주입
-            from fpat.policy_deletion_processor.processors.notification_classifier import NotificationClassifier
-            if processor_class == NotificationClassifier:
-                kwargs["excel_manager"] = self.excel_manager
-                
-            self.steps.append({
-                "id": task_id,
-                "processor": processor_class(self.config),
-                "kwargs": kwargs
-            })
-        else:
-            logger.error(f"유효하지 않은 작업 번호: {task_id}")
-
     def run(self) -> bool:
-        """등록된 모든 단계를 순차적으로 실행합니다."""
-        for step in self.steps:
-            task_id = step["id"]
-            processor = step["processor"]
-            kwargs = step["kwargs"]
-            
-            logger.info(f"파이프라인 단계 시작: Task {task_id} ({processor.__class__.__name__})")
+        """파이프라인 실행"""
+        if not self.steps:
+            logger.warning("실행할 태스크가 없습니다.")
+            return True
+
+        for processor_class, kwargs in self.steps:
+            processor = processor_class(self.config, self.excel_manager)
+            logger.info(f"태스크 실행: {processor_class.__name__}")
             
             if not processor.run(self.file_manager, **kwargs):
-                logger.error(f"파이프라인 단계 실패: Task {task_id}")
+                logger.error(f"태스크 실패: {processor_class.__name__}")
                 return False
-                
-            logger.info(f"파이프라인 단계 완료: Task {task_id}")
-            
+        
         return True
