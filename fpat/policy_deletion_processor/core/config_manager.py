@@ -136,7 +136,7 @@ class ConfigManager:
             # 1. 매칭 방식 결정
             if category == 'request_ids':
                 target_id = item.get('id', '')
-                if value == target_id:
+                if target_id and target_id in value: # 설정된 ID가 데이터에 포함되어 있는지 확인
                     match = True
             elif category == 'policy_rules':
                 pattern = item.get('pattern', '')
@@ -159,10 +159,12 @@ class ConfigManager:
                     logger.warning(f"잘못된 날짜 형식 (until): {until_str}")
                     return True # 형식 오류 시 안전을 위해 예외 유지
                     
-        # 3. 정적 리스트 체크 (호환성용)
+        # 3. 정적 리스트 체크 (호환성용, 포함 여부로 체크)
         static_list = self.get('exceptions.static_list', [])
-        if value in static_list:
-            return True
+        if static_list:
+            for static_val in static_list:
+                if static_val and static_val in value:
+                    return True
             
         return False
 
