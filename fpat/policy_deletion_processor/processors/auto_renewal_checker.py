@@ -116,10 +116,15 @@ class AutoRenewalChecker(BaseProcessor):
         logger.info(f"날짜 업데이트 반영 중: {policy_file}")
         policy_df = pd.read_excel(policy_file)
         policy_df.columns = [c.strip() for c in policy_df.columns]
+# 매핑용 사전 구축: (ID + 원본TITLE) -> (Next START, Next END)
+renew_df['key_lookup'] = renew_df['REQUEST_ID'].astype(str) + renew_df['TITLE_prev'].astype(str)
 
-        # 매핑용 사전 구축: (ID + 원본TITLE) -> (Next START, Next END)
-        renew_df['key_lookup'] = renew_df['REQUEST_ID'].astype(str) + renew_df['TITLE_prev'].astype(str)
-        lookup_map = renew_df.drop_duplicates('key_lookup', keep='last').set_index('key_lookup')[['REQUEST_START_DATE_next', 'REQUEST_END_DATE_next']].to_dict('index')
+# [수정] 가장 늦은 종료일을 가진 데이터를 상단으로 정렬 후, 첫 번째 값(가장 최신)을 선택 (VLOOKUP 방식)
+lookup_map = renew_df.sort_values(by='REQUEST_END_DATE_next', ascending=False) \
+                     .drop_duplicates('key_lookup', keep='first') \
+                     .set_index('key_lookup')[['REQUEST_START_DATE_next', 'REQUEST_END_DATE_next']] \
+                     .to_dict('index')
+
 
         updated_count = 0
         total = len(policy_df)
