@@ -82,28 +82,27 @@ class ExceptionHandler(BaseProcessor):
             df['날짜'] = pd.to_datetime(df['날짜'], format='%Y%m%d', errors='coerce')
             df.loc[(df['예외'] == '') & (df['날짜'] >= three_months_ago) & (df['날짜'] <= current_date), '예외'] = '신규정책'
 
-            # 3. 자동연장정책 표시
-            df.loc[(df['예외'] == '') & (df['REQUEST_STATUS'] == 99), '예외'] = '자동연장정책'
+            # 3. 자동연장정책 표시 (덮어쓰기)
+            df.loc[df['REQUEST_STATUS'] == 99, '예외'] = '자동연장정책'
 
-            # 4. 인프라정책 표시
+            # 4. 인프라정책 표시 (덮어쓰기)
             marker_conf = 'policy_processing.analysis_markers.paloalto'
             deny_std_rule = self.config.get(f'{marker_conf}.deny_standard_rule_name', '마스킹')
             infra_label = self.config.get(f'{marker_conf}.infrastructure_exception_label', '인프라정책')
             
             try:
-                # 'Rule Name'이 기준 정책과 일치하는 첫 번째 행의 인덱스
                 deny_std_rows = df[df['Rule Name'] == deny_std_rule]
                 if not deny_std_rows.empty:
                     deny_std_rule_index = deny_std_rows.index[0]
-                    df.loc[(df['예외'] == '') & (df.index < deny_std_rule_index), '예외'] = infra_label
+                    df.loc[df.index < deny_std_rule_index, '예외'] = infra_label
             except:
                 pass
             
-            # 5. 특수 접두사 기반 정책 표시
+            # 5. 특수 접두사 기반 정책 표시 (덮어쓰기)
             infra_prefixes = self.config.get(f'{marker_conf}.infrastructure_prefixes', [])
             if infra_prefixes:
                 infra_prefixes = tuple(infra_prefixes)
-                df.loc[(df['예외'] == '') & (df['Rule Name'].str.startswith(infra_prefixes, na=False)), '예외'] = self.config.get(f'{marker_conf}.special_policy_label', '특수정책')
+                df.loc[df['Rule Name'].str.startswith(infra_prefixes, na=False), '예외'] = self.config.get(f'{marker_conf}.special_policy_label', '특수정책')
 
             # 6. 비활성화정책 표시
             df.loc[df['Enable'] == 'N', '예외'] = '비활성화정책'
@@ -166,10 +165,10 @@ class ExceptionHandler(BaseProcessor):
                     df.at[idx, '예외'] = rule_reason
                     continue
             
-            # 2. 자동연장정책 표시
-            df.loc[(df['예외'] == '') & (df['REQUEST_STATUS'] == 99), '예외'] = '자동연장정책'
+            # 2. 자동연장정책 표시 (덮어쓰기)
+            df.loc[df['REQUEST_STATUS'] == 99, '예외'] = '자동연장정책'
             
-            # 3. 인프라정책 표시
+            # 3. 인프라정책 표시 (덮어쓰기)
             marker_conf = 'policy_processing.analysis_markers.secui'
             deny_keyword = self.config.get(f'{marker_conf}.deny_standard_description_keyword', '마스킹')
             infra_label = self.config.get(f'{marker_conf}.infrastructure_exception_label', '인프라정책')
@@ -178,11 +177,11 @@ class ExceptionHandler(BaseProcessor):
                 deny_std_rows = df[df['Description'].str.contains(deny_keyword, na=False)]
                 if not deny_std_rows.empty:
                     deny_std_rule_index = deny_std_rows.index[0]
-                    df.loc[(df['예외'] == '') & (df.index < deny_std_rule_index), '예외'] = infra_label
+                    df.loc[df.index < deny_std_rule_index, '예외'] = infra_label
             except:
                 pass
 
-            # 4. 신규정책 표시
+            # 4. 신규정책 표시 (이미 예외가 없는 경우만)
             df['Start Date'] = pd.to_datetime(df['Start Date'], errors='coerce')
             df.loc[(df['예외'] == '') & (df['Start Date'] >= three_months_ago) & (df['Start Date'] <= current_date), '예외'] = '신규정책'
 
