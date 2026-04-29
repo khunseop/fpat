@@ -117,8 +117,9 @@ class AutoRenewalChecker(BaseProcessor):
         policy_df = pd.read_excel(policy_file)
         policy_df.columns = [c.strip() for c in policy_df.columns]
 
-        # 매핑용 사전 구축: (ID + 원본TITLE) -> (Next START, Next END)
-        renew_df['key_lookup'] = renew_df['REQUEST_ID'].astype(str) + renew_df['TITLE_prev'].astype(str)
+        # 매핑용 사전 구축: (ID + 정제된TITLE) -> (Next START, Next END)
+        # renew_df에서 이미 생성된 TITLE_prev_clean 컬럼을 사용합니다.
+        renew_df['key_lookup'] = renew_df['REQUEST_ID'].astype(str) + renew_df['TITLE_prev_clean'].astype(str)
         
         # 가장 늦은 종료일을 가진 데이터를 상단으로 정렬 후, 첫 번째 값(가장 최신)을 선택 (VLOOKUP 방식)
         lookup_map = renew_df.sort_values(by='REQUEST_END_DATE_next', ascending=False) \
@@ -132,7 +133,10 @@ class AutoRenewalChecker(BaseProcessor):
         for idx, row in policy_df.iterrows():
             print(f"\r날짜 반영 중: {idx + 1}/{total}", end='', flush=True)
             
-            key = str(row.get('REQUEST_ID', '')) + str(row.get('TITLE', ''))
+            # 정책 파일의 제목도 정제하여 매핑 키 생성
+            clean_policy_title = self._remove_bracket_prefix(str(row.get('TITLE', '')))
+            key = str(row.get('REQUEST_ID', '')) + clean_policy_title
+            
             next_info = lookup_map.get(key)
             
             if not next_info: continue
