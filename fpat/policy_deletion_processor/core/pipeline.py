@@ -83,10 +83,15 @@ class Pipeline:
             return True
 
         for processor_class, kwargs in self.steps:
-            processor = processor_class(self.config, self.excel_manager)
+            # BaseProcessor는 config만 인자로 받음
+            processor = processor_class(self.config)
             logger.info(f"태스크 실행: {processor_class.__name__}")
             
-            if not processor.run(self.file_manager, **kwargs):
+            # excel_manager를 kwargs에 포함시켜 전달
+            run_kwargs = kwargs.copy()
+            run_kwargs['excel_manager'] = self.excel_manager
+            
+            if not processor.run(self.file_manager, **run_kwargs):
                 logger.error(f"태스크 실패: {processor_class.__name__}")
                 return False
         
