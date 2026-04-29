@@ -119,14 +119,22 @@ class ConfigManager:
 
     def is_excepted(self, category: str, value: str) -> bool:
         """
-        특정 항목이 현재 예외 대상인지 확인합니다 (기간 만료 체크 포함).
+        특정 항목이 현재 예외 대상인지 확인합니다 (하위 호환성용).
+        상세 사유가 필요하면 get_exception_info를 사용하세요.
+        """
+        is_matched, _ = self.get_exception_info(category, value)
+        return is_matched
+
+    def get_exception_info(self, category: str, value: str) -> tuple[bool, str]:
+        """
+        특정 항목이 예외 대상인지 확인하고 상세 사유를 반환합니다.
         
         Args:
-            category: 'request_ids' 또는 'policy_rules'
+            category: 'request_ids', 'policy_rules', 'policy_names'
             value: 체크할 ID 또는 Rule Name
             
         Returns:
-            bool: 예외 대상 여부
+            (bool, str): (예외 대상 여부, 상세 사유)
         """
         exceptions = self.get(f'exceptions.{category}', [])
         current_date = datetime.now().date()
@@ -136,37 +144,39 @@ class ConfigManager:
             # 1. 매칭 방식 결정
             if category == 'request_ids':
                 target_id = item.get('id', '')
-                if target_id and target_id in value: # 설정된 ID가 데이터에 포함되어 있는지 확인
+                if target_id and target_id in value:
                     match = True
             elif category == 'policy_rules':
                 pattern = item.get('pattern', '')
-                if re.match(pattern, value):
+                if pattern and re.search(pattern, value): # match 대신 search로 유연하게 매칭
+                    match = True
+            elif category == 'policy_names':
+                name = item.get('name', '')
+                if name == value: # 정책명은 완전 일치
                     match = True
             
             # 2. 매칭된 경우 기간 체크
             if match:
+                reason = item.get('reason', '예외정책')
                 until_str = item.get('until')
                 if not until_str:
-                    return True # 영구 예외
+                    return True, reason # 영구 예외
                 
                 try:
                     until_date = datetime.strptime(until_str, '%Y-%m-%d').date()
                     if until_date >= current_date:
-                        return True # 아직 유효한 예외
-                    else:
-                        logger.debug(f"예외 기간 만료됨: {value} (until: {until_str})")
+                        return True, reason
                 except ValueError:
-                    logger.warning(f"잘못된 날짜 형식 (until): {until_str}")
-                    return True # 형식 오류 시 안전을 위해 예외 유지
+                    return True, reason # 형식 오류 시 안전을 위해 예외 유지
                     
-        # 3. 정적 리스트 체크 (호환성용, 포함 여부로 체크)
+        # 3. 정적 리스트 체크
         static_list = self.get('exceptions.static_list', [])
         if static_list:
             for static_val in static_list:
                 if static_val and static_val in value:
-                    return True
+                    return True, "인프라정책(정적리스트)"
             
-        return False
+        return False, ""
 
     def all(self) -> Dict[str, Any]:
         return self.config_data
