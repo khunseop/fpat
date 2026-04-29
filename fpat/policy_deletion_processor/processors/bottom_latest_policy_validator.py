@@ -70,7 +70,7 @@ class BottomLatestPolicyValidator(BaseProcessor):
             # 5. 멀티 시트로 저장
             output_file = file_manager.update_version(file_name)
             
-            with pd.ExcelWriter(output_file, engine='xlsxwriter') as writer:
+            with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
                 # 메인 데이터 저장 (사용이력)
                 df.to_excel(writer, sheet_name='usage', index=False)
                 # 검증 결과 저장
