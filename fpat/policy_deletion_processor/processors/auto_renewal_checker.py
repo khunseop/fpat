@@ -19,18 +19,34 @@ class AutoRenewalChecker(BaseProcessor):
     """자동 연장 정책 분석 및 날짜 업데이트 클래스"""
     
     def run(self, file_manager, **kwargs):
-        """1단계: 정밀 분석(Chain Analysis) -> 2단계: 정책 반영(Update)"""
+        """1단계: 정책 파일 및 가공 파일 선택 -> 2단계: 정밀 분석 및 업데이트"""
         try:
-            print("\n[!] 자동 연장 정밀 분석 및 날짜 업데이트를 시작합니다.")
+            print("\n" + "="*50)
+            print("     🔄 자동 연장 날짜 업데이트 (Task 14)")
+            print("="*50)
             
-            # 1. 가공된 신청정보(conv) 선택 및 분석
-            renew_df = self._analyze_chains_precision(file_manager)
+            # 1. 업데이트 대상 정책 파일 선택 (보통 Task 5의 결과물)
+            print("\n[단계 1] 업데이트할 '분석 대상 정책 파일'을 선택하세요.")
+            target_policy_file = file_manager.select_files()
+            if not target_policy_file:
+                return False
+            
+            # 2. 참조할 신청정보 가공 파일 선택 (보통 Task 4의 결과물)
+            print("\n[단계 2] 자동연장 확인을 위한 '가공된 신청정보 파일(conv)'을 선택하세요.")
+            reference_conv_file = file_manager.select_files()
+            if not reference_conv_file:
+                return False
+
+            logger.info(f"작업 시작: 정책={target_policy_file}, 참조={reference_conv_file}")
+
+            # 3. 신청정보 가공 파일 분석 (정밀 로직)
+            renew_df = self._analyze_chains_precision(reference_conv_file)
             if renew_df is None or renew_df.empty:
-                logger.warning("자동 연장으로 판단된 데이터가 없습니다.")
+                print("\n[!] 자동 연장으로 판단된 데이터가 없습니다. 작업을 종료합니다.")
                 return False
                 
-            # 2. 정책 파일(policy) 선택 및 업데이트
-            return self._update_policy_dates(file_manager, renew_df)
+            # 4. 정책 파일 날짜 업데이트 수행
+            return self._update_policy_dates(file_manager, target_policy_file, renew_df)
             
         except Exception as e:
             logger.exception(f"실행 중 오류 발생: {e}")
@@ -57,15 +73,9 @@ class AutoRenewalChecker(BaseProcessor):
         except:
             return pd.Timestamp("1900-01-01")
 
-    def _analyze_chains_precision(self, file_manager):
-        """과거 정밀 로직: 종료일-시작일 매칭 및 작성자/제목 검증"""
-        print("\n[단계 1] 자동 연장 체인 정밀 분석")
-        print("-" * 40)
-        print("가공된 신청정보 파일(Conv_...)을 선택하세요:")
-        conv_file = file_manager.select_files()
-        if not conv_file: return None
-
-        logger.info(f"정밀 분석 시작: {conv_file}")
+    def _analyze_chains_precision(self, conv_file):
+        """종료일-시작일 매칭 및 작성자/제목 검증"""
+        logger.info(f"연장 체인 분석 중: {conv_file}")
         df = pd.read_excel(conv_file)
         
         # 필수 컬럼 확인
@@ -87,7 +97,6 @@ class AutoRenewalChecker(BaseProcessor):
         )
 
         if merged.empty:
-            logger.info("날짜가 이어지는 신청 건을 찾지 못했습니다.")
             return pd.DataFrame()
 
         # 2. 제목 정제 및 동일성 검사
@@ -100,30 +109,16 @@ class AutoRenewalChecker(BaseProcessor):
             (merged['TITLE_prev_clean'] == merged['TITLE_next_clean'])
         ].copy()
 
-        # 분석 결과 저장
-        today = datetime.now().strftime('%Y-%m-%d')
-        output_file = os.path.join("outputs", f"{today}_renewal_chain.xlsx")
-        valid_chains.to_excel(output_file, index=False)
-        
-        print(f"-> 정밀 분석 완료: {len(valid_chains)}개의 유효 연장 체인 식별.")
-        print(f"-> 분석 리스트 저장: {output_file}")
         return valid_chains
 
-    def _update_policy_dates(self, file_manager, renew_df):
+    def _update_policy_dates(self, file_manager, policy_file, renew_df):
         """분석된 체인을 정책 파일에 반영"""
-        print("\n[단계 2] 정책 파일 날짜 업데이트")
-        print("-" * 40)
-        print("업데이트할 분석 대상 정책 파일을 선택하세요:")
-        policy_file = file_manager.select_files()
-        if not policy_file: return False
-
+        logger.info(f"날짜 업데이트 반영 중: {policy_file}")
         policy_df = pd.read_excel(policy_file)
         policy_df.columns = [c.strip() for c in policy_df.columns]
 
         # 매핑용 사전 구축: (ID + 원본TITLE) -> (Next START, Next END)
-        # renew_df에서 _prev가 현재 값, _next가 연장된 값임
         renew_df['key_lookup'] = renew_df['REQUEST_ID'].astype(str) + renew_df['TITLE_prev'].astype(str)
-        # 중복 시 마지막(가장 최신) 것 유지
         lookup_map = renew_df.drop_duplicates('key_lookup', keep='last').set_index('key_lookup')[['REQUEST_START_DATE_next', 'REQUEST_END_DATE_next']].to_dict('index')
 
         updated_count = 0
@@ -162,6 +157,6 @@ class AutoRenewalChecker(BaseProcessor):
         new_file_name = file_manager.update_version(policy_file)
         policy_df.to_excel(new_file_name, index=False)
         
-        print(f"✅ 업데이트 완료: 총 {updated_count}건의 날짜가 최신화되었습니다.")
-        print(f"최종 결과 저장: {new_file_name}")
+        print(f"\n✅ 업데이트 완료: 총 {updated_count}건의 날짜가 최신화되었습니다.")
+        print(f"📄 최종 결과 저장: {new_file_name}")
         return True
