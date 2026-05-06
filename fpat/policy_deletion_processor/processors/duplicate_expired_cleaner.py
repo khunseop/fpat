@@ -126,8 +126,9 @@ class DuplicateExpiredCleaner(BaseProcessor):
             df_delete_new.to_excel(delete_output, index=False, engine='openpyxl')
 
             # 10. 미사용 예외 데이터 추출 및 YAML 통합 관리 (개선)
-            if '미사용예외' in df_summary.columns:
-                unused_exc_df = df_summary[df_summary['미사용예외'] == True].copy()
+            # 주의: 이미 예외 시트로 분리된 all_exception_nos는 제외하고, 실제 작업 대상인 df_summary_main에서만 추출함
+            if '미사용예외' in df_summary_main.columns:
+                unused_exc_df = df_summary_main[df_summary_main['미사용예외'] == True].copy()
                 
                 if not unused_exc_df.empty:
                     print("\n[예외 기록] 대상 방화벽명을 입력하세요 (예: FW_MAIN, PA_SEOUL):")
