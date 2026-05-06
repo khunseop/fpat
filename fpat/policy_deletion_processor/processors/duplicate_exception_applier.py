@@ -26,7 +26,7 @@ class DuplicateExceptionApplier(BaseProcessor):
             if not policy_file: return False
             
             print("중복정책 예외 관리 파일(duplicate_exceptions.yaml)을 선택하세요:")
-            yaml_file = file_manager.select_files()
+            yaml_file = file_manager.select_files(extension=['.yaml', '.yml'])
             if not yaml_file: return False
 
             # 2. 데이터 로드

@@ -79,9 +79,15 @@ class FileManager:
         if extension is None:
             extension = self.config.get('file_management.default_extension', '.xlsx')
             
-        file_list = [file for file in os.listdir() if file.endswith(extension)]
+        # 단일 문자열인 경우 리스트로 변환
+        if isinstance(extension, str):
+            extensions = [extension]
+        else:
+            extensions = extension
+            
+        file_list = [file for file in os.listdir() if any(file.endswith(ext) for ext in extensions)]
         if not file_list:
-            print(f"{extension} 확장자를 가진 파일이 없습니다.")
+            print(f"{extensions} 확장자를 가진 파일이 없습니다.")
             return None
         
         for i, file in enumerate(file_list, start=1):
