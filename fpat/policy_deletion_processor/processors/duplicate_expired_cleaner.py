@@ -8,6 +8,7 @@
 import logging
 import pandas as pd
 import os
+import yaml
 from datetime import datetime, timedelta
 from .base_processor import BaseProcessor
 
@@ -124,29 +125,37 @@ class DuplicateExpiredCleaner(BaseProcessor):
             delete_output = file_manager.update_version(delete_file, False)
             df_delete_new.to_excel(delete_output, index=False, engine='openpyxl')
 
-            # 10. 미사용 예외 데이터 추출 및 별도 저장 (신규)
+            # 10. 미사용 예외 데이터 추출 및 YAML 저장 (신규)
             if '미사용예외' in df_summary.columns:
-                # 미사용예외가 True인 정책만 필터링 (NaN 처리 포함)
                 unused_exc_df = df_summary[df_summary['미사용예외'] == True].copy()
                 
                 if not unused_exc_df.empty:
                     current_time = datetime.now()
                     today_str = current_time.strftime('%Y-%m-%d')
-                    expiry_str = (current_time + timedelta(days=90)).strftime('%Y-%m-%d') # 기본 90일 유효
+                    expiry_str = (current_time + timedelta(days=90)).strftime('%Y-%m-%d')
                     
-                    # 관리 양식에 맞춰 데이터 재구성
-                    exc_record_df = pd.DataFrame({
-                        '방화벽명': ['(추후구현)'] * len(unused_exc_df),
-                        '정책명': unused_exc_df['Rule Name'],
-                        '등록날짜': [today_str] * len(unused_exc_df),
-                        '유효기간': [expiry_str] * len(unused_exc_df)
-                    })
+                    # fpat.yaml 구조에 맞춘 데이터 구성
+                    yaml_data = {
+                        'duplicate_unused_exceptions': []
+                    }
                     
-                    # 파일명 생성 및 저장
-                    exc_filename = f"중복정책미사용예외_{current_time.strftime('%Y%m%d_%H%M%S')}.xlsx"
-                    exc_path = os.path.join(os.path.dirname(summary_output), exc_filename)
-                    exc_record_df.to_excel(exc_path, index=False, engine='openpyxl')
-                    print(f"- 중복정책미사용예외 기록 완료: {exc_path}")
+                    for rule_name in unused_exc_df['Rule Name'].unique():
+                        yaml_data['duplicate_unused_exceptions'].append({
+                            'name': str(rule_name),
+                            'reason': '중복정책삭제_하단노출_임시예외',
+                            'registered_at': today_str,
+                            'expires_at': expiry_str,
+                            'firewall': '추후구현'
+                        })
+                    
+                    # YAML 파일명 생성 및 저장
+                    yaml_filename = f"duplicate_exceptions_{current_time.strftime('%Y%m%d_%H%M%S')}.yaml"
+                    yaml_path = os.path.join(os.path.dirname(summary_output), yaml_filename)
+                    
+                    with open(yaml_path, 'w', encoding='utf-8') as f:
+                        yaml.dump(yaml_data, f, allow_unicode=True, sort_keys=False, default_flow_style=False)
+                    
+                    print(f"- 중복정책미사용예외 YAML 기록 완료: {yaml_path}")
 
             print(f"\n✨ 작업 완료!")
             print(f"- 정리파일(시트분리): {summary_output}")
