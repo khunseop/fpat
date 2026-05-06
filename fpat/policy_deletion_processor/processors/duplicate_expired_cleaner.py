@@ -51,28 +51,64 @@ class DuplicateExpiredCleaner(BaseProcessor):
             expiry_map = df_policy.set_index('Rule Name')['만료여부'].to_dict()
             df_summary['만료여부'] = df_summary['Rule Name'].map(expiry_map).fillna('확인필요')
 
-            # 4. 모든 행이 '만료'인 중복 세트(No) 찾기
-            # 'No'별로 그룹화하여 모든 '만료여부'가 '만료'인 그룹의 No 목록 추출
+            # 4. 예외 대상 분류 (1): 모든 행이 '만료'인 중복 세트(No)
             def check_all_expired(group):
                 return (group == '만료').all()
 
             expired_series = df_summary.groupby('No')['만료여부'].apply(check_all_expired)
             expired_nos = expired_series[expired_series].index.tolist()
 
-            if not expired_nos:
-                print("ℹ️ 모든 정책이 '만료'인 중복 세트가 없습니다.")
+            # 5. 예외 대상 분류 (2): 차단 정책 영향 분석 (하단최신정책 관련)
+            # 5-1. 정책 파일에서 기초 정보 추출
+            bottom_latest_req_ids = set(df_policy[df_policy['미사용여부'] == '하단최신정책']['REQUEST_ID'].dropna().unique())
+            deny_seqs = sorted(df_policy[df_policy['Action'].str.lower() == 'deny']['Seq'].tolist())
+            
+            blocking_impact_nos = []
+            
+            # 5-2. '하단최신정책' 신청번호가 포함된 중복 세트(No) 추출
+            potential_nos = df_summary[df_summary['Request ID'].isin(bottom_latest_req_ids)]['No'].unique()
+            
+            for no in potential_nos:
+                group_df = df_summary[df_summary['No'] == no]
+                
+                # 삭제 대상 중 가장 상단(최소 Seq)과 유지 대상 중 가장 하단(최대 Seq) 추출
+                delete_seqs = group_df[group_df['작업구분'] == '삭제']['Seq']
+                keep_seqs = group_df[group_df['작업구분'] == '유지']['Seq']
+                
+                if not delete_seqs.empty and not keep_seqs.empty:
+                    min_del_seq = delete_seqs.min()
+                    max_keep_seq = keep_seqs.max()
+                    
+                    # 삭제되는 상단 정책과 유지되는 하단 정책 사이에 차단(deny) 정책이 있는지 확인
+                    # 로직: min_del_seq < deny_seq < max_keep_seq
+                    is_blocked = any(min_del_seq < s < max_keep_seq for s in deny_seqs)
+                    
+                    if is_blocked:
+                        blocking_impact_nos.append(no)
+
+            # 6. 최종 예외 No 합치기 및 사유 기입
+            all_exception_nos = list(set(expired_nos + blocking_impact_nos))
+            
+            df_summary['비고'] = ''
+            df_summary.loc[df_summary['No'].isin(expired_nos), '비고'] = '전체만료'
+            df_summary.loc[df_summary['No'].isin(blocking_impact_nos), '비고'] = '차단영향위험'
+
+            if not all_exception_nos:
+                print("ℹ️ 예외 처리할 중복 세트가 없습니다.")
             else:
-                print(f"✅ 총 {len(expired_nos)}개의 만료 세트를 발견했습니다. (No: {expired_nos})")
+                print(f"✅ 총 {len(all_exception_nos)}개의 예외 세트를 발견했습니다.")
+                if expired_nos: print(f"   - 전체만료: {len(expired_nos)}개")
+                if blocking_impact_nos: print(f"   - 차단영향: {len(blocking_impact_nos)}개")
 
-            # 5. 중복 정리 파일 처리 (메인 시트에서 제거 및 예외 시트로 이동)
-            df_summary_main = df_summary[~df_summary['No'].isin(expired_nos)].copy()
-            df_summary_exc = df_summary[df_summary['No'].isin(expired_nos)].copy()
+            # 7. 데이터 분리
+            df_summary_main = df_summary[~df_summary['No'].isin(all_exception_nos)].copy()
+            df_summary_exc = df_summary[df_summary['No'].isin(all_exception_nos)].copy()
 
-            # 6. 공지 및 삭제 파일에서 해당 No 제거
-            df_notice_new = df_notice[~df_notice['No'].isin(expired_nos)].copy()
-            df_delete_new = df_delete[~df_delete['No'].isin(expired_nos)].copy()
+            # 8. 공지 및 삭제 파일에서 해당 No 제거
+            df_notice_new = df_notice[~df_notice['No'].isin(all_exception_nos)].copy()
+            df_delete_new = df_delete[~df_delete['No'].isin(all_exception_nos)].copy()
 
-            # 7. 파일 저장 (openpyxl 엔진 사용)
+            # 9. 파일 저장 (openpyxl 엔진 사용)
             # 정리 파일 (두 개의 시트로 저장)
             summary_output = file_manager.update_version(summary_file, False)
             with pd.ExcelWriter(summary_output, engine='openpyxl') as writer:
