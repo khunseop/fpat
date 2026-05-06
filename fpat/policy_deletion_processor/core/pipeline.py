@@ -45,6 +45,7 @@ class Pipeline:
             from fpat.policy_deletion_processor.processors.bottom_latest_policy_validator import BottomLatestPolicyValidator
             from fpat.policy_deletion_processor.processors.duplicate_policy_classifier import DuplicatePolicyClassifier
             from fpat.policy_deletion_processor.processors.duplicate_expired_cleaner import DuplicateExpiredCleaner
+            from fpat.policy_deletion_processor.processors.duplicate_exception_applier import DuplicateExceptionApplier
             from fpat.policy_deletion_processor.processors.merge_hitcount import MergeHitcount
             from fpat.policy_deletion_processor.processors.policy_usage_processor import PolicyUsageProcessor
             from fpat.policy_deletion_processor.processors.auto_renewal_checker import AutoRenewalChecker
@@ -70,7 +71,8 @@ class Pipeline:
                 14: {"class": PolicyUsageProcessor, "kwargs": {"mode": "update"}},
                 15: {"class": AutoRenewalChecker, "kwargs": {}},
                 16: {"class": NotificationClassifier, "kwargs": {}},
-                17: {"class": RedundancyProcessor, "kwargs": {}}
+                17: {"class": RedundancyProcessor, "kwargs": {}},
+                18: {"class": DuplicateExceptionApplier, "kwargs": {}}
             }
 
             return registry.get(int(task_id))
