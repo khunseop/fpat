@@ -43,6 +43,13 @@ class DuplicatePolicyClassifier(BaseProcessor):
             if not selected_file:
                 return False
             
+            # 이메일 정보 매핑을 위한 정책 원본 파일
+            print('정책 원본 파일을 선택하세요:')
+            policy_file = file_manager.select_files()
+            if not policy_file:
+                return False
+            policy_df = pd.read_excel(policy_file)
+            
             # 자동 연장 ID 찾기
             print('가공된 신청정보 파일을 선택하세요:')
             info_file = file_manager.select_files()
@@ -65,10 +72,15 @@ class DuplicatePolicyClassifier(BaseProcessor):
                 if input().lower() != 'y':
                     return False
             
-            # 자동연장 여부 표시
+            # 0. 이메일 정보 매핑 (추가)
+            if 'Rule Name' in policy_df.columns and 'REQUESTER_EMAIL' in policy_df.columns:
+                email_map = policy_df.set_index('Rule Name')['REQUESTER_EMAIL'].to_dict()
+                df['Requester Email'] = df['Rule Name'].map(email_map).fillna('')
+            
+            # 1. 자동연장 여부 표시
             df['자동연장'] = df['Request ID'].isin(auto_extension_id)
             
-            # 늦은종료일 표시 (각 No 그룹에서 가장 늦은 종료일을 가진 행)
+            # 2. 늦은종료일 표시 (각 No 그룹에서 가장 늦은 종료일을 가진 행)
             df['늦은종료일'] = df.groupby('No')['End Date'].transform(lambda x: (x == x.max()) & (~x.duplicated(keep='first')))
             
             # 신청자 검증 (각 No 그룹의 신청자가 모두 동일한지)
@@ -137,8 +149,11 @@ class DuplicatePolicyClassifier(BaseProcessor):
             columns_to_drop = ['Request Type', 'Ruleset ID', 'MIS ID', 'Start Date', 'End Date', 
                               '늦은종료일', '신청자검증', '날짜검증', '공지여부', '미사용예외', '자동연장']
             
-            notice_df.drop(columns=columns_to_drop, inplace=True, errors='ignore')
-            delete_df.drop(columns=columns_to_drop, inplace=True, errors='ignore')
+            # 보안 민감 컬럼 추가 제거 (공지용/삭제용)
+            extra_drop = ['Vsys', 'Seq', 'Enable', 'Action']
+            
+            notice_df.drop(columns=columns_to_drop + extra_drop, inplace=True, errors='ignore')
+            delete_df.drop(columns=columns_to_drop + extra_drop, inplace=True, errors='ignore')
             
             # 결과 저장
             filename = file_manager.remove_extension(selected_file)
