@@ -125,37 +125,66 @@ class DuplicateExpiredCleaner(BaseProcessor):
             delete_output = file_manager.update_version(delete_file, False)
             df_delete_new.to_excel(delete_output, index=False, engine='openpyxl')
 
-            # 10. 미사용 예외 데이터 추출 및 YAML 저장 (신규)
+            # 10. 미사용 예외 데이터 추출 및 YAML 통합 관리 (개선)
             if '미사용예외' in df_summary.columns:
                 unused_exc_df = df_summary[df_summary['미사용예외'] == True].copy()
                 
                 if not unused_exc_df.empty:
+                    print("\n[예외 기록] 대상 방화벽명을 입력하세요 (예: FW_MAIN, PA_SEOUL):")
+                    firewall_name = input(">> ").strip() or "Unknown_FW"
+                    
                     current_time = datetime.now()
                     today_str = current_time.strftime('%Y-%m-%d')
                     expiry_str = (current_time + timedelta(days=90)).strftime('%Y-%m-%d')
                     
-                    # fpat.yaml 구조에 맞춘 데이터 구성
-                    yaml_data = {
-                        'duplicate_unused_exceptions': []
-                    }
+                    # 통합 YAML 파일 경로 (정리 파일과 동일한 디렉토리 또는 지정된 data 디렉토리)
+                    yaml_path = os.path.join(os.path.dirname(summary_output), "duplicate_exceptions.yaml")
+                    
+                    # 기존 데이터 로드
+                    all_exceptions = {}
+                    if os.path.exists(yaml_path):
+                        try:
+                            with open(yaml_path, 'r', encoding='utf-8') as f:
+                                all_exceptions = yaml.safe_load(f) or {}
+                        except Exception as e:
+                            logger.warning(f"기존 YAML 로드 실패: {e}")
+
+                    # 해당 방화벽의 기존 예외 리스트 가져오기 (없으면 생성)
+                    if firewall_name not in all_exceptions:
+                        all_exceptions[firewall_name] = []
+                    
+                    # 신규 예외 추가 및 업데이트
+                    existing_policy_names = {p['name']: i for i, p in enumerate(all_exceptions[firewall_name])}
+                    
+                    new_count = 0
+                    update_count = 0
                     
                     for rule_name in unused_exc_df['Rule Name'].unique():
-                        yaml_data['duplicate_unused_exceptions'].append({
-                            'name': str(rule_name),
+                        rule_name_str = str(rule_name)
+                        new_entry = {
+                            'name': rule_name_str,
                             'reason': '중복정책삭제_하단노출_임시예외',
                             'registered_at': today_str,
-                            'expires_at': expiry_str,
-                            'firewall': '추후구현'
-                        })
+                            'expires_at': expiry_str
+                        }
+                        
+                        if rule_name_str in existing_policy_names:
+                            # 기존 항목 업데이트
+                            idx = existing_policy_names[rule_name_str]
+                            all_exceptions[firewall_name][idx] = new_entry
+                            update_count += 1
+                        else:
+                            # 신규 항목 추가
+                            all_exceptions[firewall_name].append(new_entry)
+                            new_count += 1
                     
-                    # YAML 파일명 생성 및 저장
-                    yaml_filename = f"duplicate_exceptions_{current_time.strftime('%Y%m%d_%H%M%S')}.yaml"
-                    yaml_path = os.path.join(os.path.dirname(summary_output), yaml_filename)
-                    
+                    # YAML 저장
                     with open(yaml_path, 'w', encoding='utf-8') as f:
-                        yaml.dump(yaml_data, f, allow_unicode=True, sort_keys=False, default_flow_style=False)
+                        yaml.dump(all_exceptions, f, allow_unicode=True, sort_keys=False, default_flow_style=False)
                     
-                    print(f"- 중복정책미사용예외 YAML 기록 완료: {yaml_path}")
+                    print(f"✅ 중복정책 미사용 예외 통합 관리 파일 업데이트 완료!")
+                    print(f"   - 파일경로: {yaml_path}")
+                    print(f"   - 방화벽: {firewall_name} (신규: {new_count}, 갱신: {update_count})")
 
             print(f"\n✨ 작업 완료!")
             print(f"- 정리파일(시트분리): {summary_output}")
