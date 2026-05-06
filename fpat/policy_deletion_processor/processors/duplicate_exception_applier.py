@@ -52,14 +52,21 @@ class DuplicateExceptionApplier(BaseProcessor):
             fw_exceptions = all_exceptions[firewall_name]
             current_date = datetime.now().date()
             
-            # 유효한 예외 정책명 목록 추출 (만료되지 않은 건만)
+            # 유효한 예외 정책명 목록 추출 (만료되지 않았고, 오늘 등록된 건 제외)
             valid_exc_names = []
             for item in fw_exceptions:
                 expires_at = datetime.strptime(item['expires_at'], '%Y-%m-%d').date()
-                if expires_at >= current_date:
+                registered_at = datetime.strptime(item['registered_at'], '%Y-%m-%d').date()
+                
+                # 1. 만료일이 오늘 이후여야 함
+                # 2. 등록일이 오늘이 아니어야 함 (작업 당일 발생한 예외는 다음 분석부터 반영)
+                if expires_at >= current_date and registered_at < current_date:
                     valid_exc_names.append(item['name'])
                 else:
-                    logger.info(f"만료된 예외 제외: {item['name']} (만료일: {item['expires_at']})")
+                    if registered_at == current_date:
+                        logger.info(f"당일 등록 예외 제외 (다음 분석 시 반영): {item['name']}")
+                    else:
+                        logger.info(f"만료된 예외 제외: {item['name']} (만료일: {item['expires_at']})")
 
             if not valid_exc_names:
                 print("ℹ️ 유효기간 내에 있는 예외 정책이 없습니다.")
