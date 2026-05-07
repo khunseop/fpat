@@ -105,16 +105,14 @@ class NotificationClassifier(BaseProcessor):
         """
         만료된 사용 정책을 분류합니다.
         """
-        # 만료된 사용 정책 필터링 (예외 사유 중 '중복정책_미사용예외'는 제외)
-        mask = (
+        # 만료된 사용 정책 필터링
+        filtered_df = df[
             ((df['예외'].isna()) | (df['예외'] == '신규정책')) &
-            (df['미사용여부'] != '중복정책_미사용예외') &
+            (df['중복여부'].isna()) &
             (df['신청이력'] != 'Unknown') &
-            (df['만료여부'].astype(str).str.contains('만료')) &
-            (df['미사용여부'].astype(str).str.contains('사용')) &
-            (~df['미사용여부'].astype(str).str.contains('미사용'))
-        )
-        filtered_df = df[mask]
+            (df['만료여부'] == '만료') &
+            (df['미사용여부'] == '사용')
+        ]
         
         if filtered_df.empty:
             logger.info("만료된 사용 정책이 없습니다.")
@@ -149,14 +147,13 @@ class NotificationClassifier(BaseProcessor):
         만료된 미사용 정책을 분류합니다.
         """
         # 만료된 미사용 정책 필터링
-        mask = (
+        filtered_df = df[
             ((df['예외'].isna()) | (df['예외'] == '신규정책')) &
-            (df['미사용여부'] != '중복정책_미사용예외') &
+            (df['중복여부'].isna()) &
             (df['신청이력'] != 'Unknown') &
-            (df['만료여부'].astype(str).str.contains('만료')) &
-            (df['미사용여부'].astype(str).str.contains('미사용'))
-        )
-        filtered_df = df[mask]
+            (df['만료여부'] == '만료') &
+            (df['미사용여부'] == '미사용')
+        ]
         
         if filtered_df.empty:
             logger.info("만료된 미사용 정책이 없습니다.")
@@ -191,14 +188,13 @@ class NotificationClassifier(BaseProcessor):
         장기 미사용 정책을 분류합니다.
         """
         # 장기 미사용 정책 필터링
-        mask = (
+        filtered_df = df[
             (df['예외'].isna()) &
-            (df['미사용여부'] != '중복정책_미사용예외') &
-            (df['신청이력'].isin(['GROUP', 'GENERAL', 'Unknown_Chain'])) &
-            (df['만료여부'].astype(str).str.contains('미만료')) &
-            (df['미사용여부'].astype(str).str.contains('미사용'))
-        )
-        filtered_df = df[mask]
+            (df['중복여부'].isna()) &
+            (df['신청이력'].isin(['GROUP', 'GENERAL'])) &
+            (df['만료여부'] == '미만료') &
+            (df['미사용여부'] == '미사용')
+        ]
         
         if filtered_df.empty:
             logger.info("장기 미사용 정책이 없습니다.")
@@ -233,13 +229,12 @@ class NotificationClassifier(BaseProcessor):
         이력 없는 미사용 정책을 분류합니다.
         """
         # 이력 없는 미사용 정책 필터링
-        mask = (
+        filtered_df = df[
             (df['예외'].isna()) &
-            (df['미사용여부'] != '중복정책_미사용예외') &
+            (df['중복여부'].isna()) &
             (df['신청이력'] == 'Unknown') &
-            (df['미사용여부'].astype(str).str.contains('미사용'))
-        )
-        filtered_df = df[mask]
+            (df['미사용여부'] == '미사용')
+        ]
         
         if filtered_df.empty:
             logger.info("이력 없는 미사용 정책이 없습니다.")
