@@ -22,16 +22,27 @@ class RequestInfoAdder(BaseProcessor):
     def read_and_process_excel(self, file):
         """
         Excel 파일을 읽고 초기 처리합니다.
-        
-        Args:
-            file (str): 파일 경로
-            
-        Returns:
-            DataFrame: 처리된 DataFrame
         """
         df = pd.read_excel(file)
+        # 문자열 'nan'이나 실제 NaN 값을 처리
         df.replace({'nan': None}, inplace=True)
-        return df.astype(str)
+        return df
+
+    def _safe_to_datetime(self, val):
+        """날짜 형식을 안전하게 변환합니다. (1900-01-01 이전/오류 데이터 처리 강화)"""
+        if pd.isna(val) or val == "" or str(val).strip() in ["1900-01-01", "1900-01-01 00:00:00", "1900-01-00", "1900-01-00 00:00:00", "0", "00:00:00", "1899-12-30"]:
+            return pd.Timestamp("1900-01-01")
+        try:
+            # 숫자로 들어오는 경우 처리 (Excel serial date)
+            if isinstance(val, (int, float)):
+                return pd.to_datetime(val, unit='D', origin='1899-12-30').normalize()
+            dt = pd.to_datetime(val).normalize()
+            # 1900-01-01 미만인 경우 보정 (1899년 표시 방지)
+            if dt < pd.Timestamp("1900-01-01"):
+                return pd.Timestamp("1900-01-01")
+            return dt
+        except:
+            return pd.Timestamp("1900-01-01")
     
     def match_and_update_df(self, rule_df, info_df):
         """
@@ -41,8 +52,9 @@ class RequestInfoAdder(BaseProcessor):
             rule_df (DataFrame): 규칙 DataFrame
             info_df (DataFrame): 정보 DataFrame
         """
-        rule_df['End Date'] = pd.to_datetime(rule_df['End Date']).dt.normalize()
-        info_df['REQUEST_END_DATE'] = pd.to_datetime(info_df['REQUEST_END_DATE']).dt.normalize()
+        # 날짜 컬럼 안전하게 변환
+        rule_df['End Date'] = rule_df['End Date'].apply(self._safe_to_datetime)
+        info_df['REQUEST_END_DATE'] = info_df['REQUEST_END_DATE'].apply(self._safe_to_datetime)
 
         # O(1) 검색을 위한 해시맵(Dictionary) 구축
         # info_df를 원래 인덱스 순서대로 정렬하여, 원본 코드의 subset.sort_index().iloc[0] 로직과 동일하게 첫 번째 매칭값을 사용
@@ -85,7 +97,7 @@ class RequestInfoAdder(BaseProcessor):
         for i, (idx, row) in enumerate(rule_df.iterrows()):
             print(f"\r신청 정보 매칭 중: {i + 1}/{total}", end='', flush=True)
             
-            req_type = row.get('Request Type')
+            req_type = str(row.get('Request Type'))
             req_id = str(row.get('Request ID'))
             mis_id = str(row.get('MIS ID'))
             end_date = row.get('End Date')
@@ -99,7 +111,7 @@ class RequestInfoAdder(BaseProcessor):
                 # 원본 필터링 로직 순서대로 매칭 시도
                 if k1 in dict_group_cond1:
                     first = dict_group_cond1[k1]
-                elif not pd.isna(end_date):  # pandas NaT 비교 오류 방지 (원본도 NaT는 매칭 실패함)
+                elif not pd.isna(end_date) and end_date != pd.Timestamp("1900-01-01"):  # 기본값(1900)은 매칭에서 제외
                     if k2 in dict_group_cond2:
                         first = dict_group_cond2[k2]
                     elif k2 in dict_group_cond3:
@@ -111,13 +123,13 @@ class RequestInfoAdder(BaseProcessor):
             if first is not None:
                 for col, val in first.items():
                     if col in ['REQUEST_START_DATE', 'REQUEST_END_DATE', 'Start Date', 'End Date']:
-                        rule_df.at[idx, col] = pd.to_datetime(val, errors='coerce')
+                        rule_df.at[idx, col] = self._safe_to_datetime(val)
                     else:
                         rule_df.at[idx, col] = val
-            elif req_type != 'nan' and req_type != 'Unknown':
+            elif req_type != 'nan' and req_type != 'Unknown' and req_type != 'None':
                 rule_df.at[idx, 'REQUEST_ID'] = req_id
-                rule_df.at[idx, 'REQUEST_START_DATE'] = pd.to_datetime(row.get('Start Date'), errors='coerce')
-                rule_df.at[idx, 'REQUEST_END_DATE'] = pd.to_datetime(end_date, errors='coerce')
+                rule_df.at[idx, 'REQUEST_START_DATE'] = self._safe_to_datetime(row.get('Start Date'))
+                rule_df.at[idx, 'REQUEST_END_DATE'] = self._safe_to_datetime(end_date)
                 rule_df.at[idx, 'REQUESTER_ID'] = req_user
                 rule_df.at[idx, 'REQUESTER_EMAIL'] = str(req_user) + '@samsung.com'
         
@@ -193,7 +205,7 @@ class RequestInfoAdder(BaseProcessor):
                 logger.info(f"{len(rule_df[rule_df['REQUEST_STATUS'] == '99'])}개의 정책에 자동 연장 상태를 설정했습니다.")
             
             new_file_name = file_manager.update_version(rule_file)
-            rule_df.to_excel(new_file_name, index=False)
+            rule_df.to_excel(new_file_name, index=False, engine='openpyxl')
             logger.info(f"신청 정보 매핑 결과를 '{new_file_name}'에 저장했습니다.")
             print(f"신청 정보 매핑 결과가 '{new_file_name}'에 저장되었습니다.")
             
