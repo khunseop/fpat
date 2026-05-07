@@ -116,8 +116,8 @@ class RequestInfoAdder(BaseProcessor):
                         rule_df.at[idx, col] = val
             elif req_type != 'nan' and req_type != 'Unknown':
                 rule_df.at[idx, 'REQUEST_ID'] = req_id
-                rule_df.at[idx, 'REQUEST_START_DATE'] = row.get('Start Date')
-                rule_df.at[idx, 'REQUEST_END_DATE'] = end_date
+                rule_df.at[idx, 'REQUEST_START_DATE'] = pd.to_datetime(row.get('Start Date'), errors='coerce')
+                rule_df.at[idx, 'REQUEST_END_DATE'] = pd.to_datetime(end_date, errors='coerce')
                 rule_df.at[idx, 'REQUESTER_ID'] = req_user
                 rule_df.at[idx, 'REQUESTER_EMAIL'] = str(req_user) + '@samsung.com'
         
