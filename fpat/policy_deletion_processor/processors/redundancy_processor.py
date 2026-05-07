@@ -74,7 +74,7 @@ class RedundancyProcessor(BaseProcessor):
             parts = filename.split('_')
             ip_part = parts[1] if len(parts) > 1 else 'unknown'
             
-            output_file = os.path.join("outputs", f"{today}_{ip_part}_redundancy.xlsx")
+            output_file = f"{today}_{ip_part}_redundancy.xlsx"
             result_df.to_excel(output_file, index=False)
             
             logger.info(f"중복 분석 완료: {len(result_df)}개 항목 발견. 저장: {output_file}")

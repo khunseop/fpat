@@ -31,7 +31,7 @@ class FileManager:
 
     def update_version(self, filename, final_version=False):
         """
-        파일 이름의 버전을 업데이트하고 outputs 폴더 경로를 반환합니다.
+        파일 이름의 버전을 업데이트하고 현재 디렉터리 경로를 반환합니다.
         """
         # 기존 경로 정보 제거하고 파일명만 추출
         pure_filename = os.path.basename(filename)
@@ -56,12 +56,8 @@ class FileManager:
             else:
                 new_base_name = f"{base_name}{version_format.format(version=1)}"
         
-        # 항상 outputs 폴더에 저장
-        if not os.path.exists("outputs"):
-            os.makedirs("outputs")
-            
-        new_filename = os.path.join("outputs", f"{new_base_name}.{ext}")
-        logger.info(f"결과 파일 경로: {new_filename}")
+        new_filename = f"{new_base_name}.{ext}"
+        logger.info(f"결과 파일명: {new_filename}")
         return new_filename
     
     def select_files(self, extension=None):

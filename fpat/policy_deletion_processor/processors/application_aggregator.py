@@ -160,7 +160,7 @@ class ApplicationAggregator(BaseProcessor):
             # 2. 결과 파일명 결정 (표준 포맷)
             from datetime import datetime
             today = datetime.now().strftime('%Y-%m-%d')
-            output_file = os.path.join("outputs", f"{today}_gsams_conv.xlsx")
+            output_file = f"{today}_gsams_conv.xlsx"
 
             # 3. 가공 프로세스 실행
             self.process_applications(file_name, output_file)
