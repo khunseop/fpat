@@ -155,10 +155,17 @@ class AutoRenewalChecker(BaseProcessor):
             new_start = self._safe_to_datetime(next_info['REQUEST_START_DATE_next'])
             new_end = self._safe_to_datetime(next_info['REQUEST_END_DATE_next'])
 
-            # 자동 연장 체인이 확인된 경우 무조건 새로운 날짜로 덮어쓰기 (기존 데이터 오류 대응)
-            policy_df.at[idx, 'REQUEST_START_DATE'] = new_start
-            policy_df.at[idx, 'REQUEST_END_DATE'] = new_end
-            is_row_updated = True
+            is_row_updated = False
+            
+            # Start Date 업데이트 조건: 더 최신 날짜일 경우만 (Timestamp 객체 비교)
+            if new_start > curr_req_start and new_start > curr_base_start:
+                policy_df.at[idx, 'REQUEST_START_DATE'] = new_start
+                is_row_updated = True
+                
+            # End Date 업데이트 조건
+            if new_end > curr_req_end and new_end > curr_base_end:
+                policy_df.at[idx, 'REQUEST_END_DATE'] = new_end
+                is_row_updated = True
             
             if is_row_updated: updated_count += 1
 
