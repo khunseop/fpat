@@ -35,55 +35,91 @@ class RequestInfoAdder(BaseProcessor):
     
     def match_and_update_df(self, rule_df, info_df):
         """
-        조건에 따라 DataFrame의 값을 매칭 및 업데이트합니다.
+        조건에 따라 DataFrame의 값을 매칭 및 업데이트합니다. (Dictionary 해시맵 O(1) 최적화)
         
         Args:
             rule_df (DataFrame): 규칙 DataFrame
             info_df (DataFrame): 정보 DataFrame
         """
-        
-        # rule_df['End Date'] = pd.to_datetime(rule_df['End Date']).dt.date
-        # info_df['REQUEST_END_DATE'] = pd.to_datetime(info_df['REQUEST_END_DATE']).dt.date
-
         rule_df['End Date'] = pd.to_datetime(rule_df['End Date']).dt.normalize()
         info_df['REQUEST_END_DATE'] = pd.to_datetime(info_df['REQUEST_END_DATE']).dt.normalize()
 
-        total = len(rule_df)
-        for idx, row in rule_df.iterrows():
-            print(f"\r신청 정보 매칭 중: {idx + 1}/{total}", end='', flush=True)
-            matched_row = pd.DataFrame()
+        # O(1) 검색을 위한 해시맵(Dictionary) 구축
+        # info_df를 원래 인덱스 순서대로 정렬하여, 원본 코드의 subset.sort_index().iloc[0] 로직과 동일하게 첫 번째 매칭값을 사용
+        info_df_sorted = info_df.sort_index()
+        info_records = info_df_sorted.to_dict('records')
+        
+        dict_group_cond1 = {}
+        dict_group_cond2 = {}
+        dict_group_cond3 = {}
+        dict_normal_cond = {}
+        
+        for row in info_records:
+            req_id = str(row.get('REQUEST_ID'))
+            mis_id = str(row.get('MIS_ID'))
+            end_date = row.get('REQUEST_END_DATE')
+            write_person = str(row.get('WRITE_PERSON_ID'))
+            requester = str(row.get('REQUESTER_ID'))
             
-            if row['Request Type'] == 'GROUP':
-                match_conditions = [
-                    ((info_df['REQUEST_ID'] == row['Request ID']) & (info_df['MIS_ID'] == row['MIS ID'])),
-                    ((info_df['REQUEST_ID'] == row['Request ID']) & (info_df['REQUEST_END_DATE'] == row['End Date']) & (info_df['WRITE_PERSON_ID'] == row['Request User'])),
-                    ((info_df['REQUEST_ID'] == row['Request ID']) & (info_df['REQUEST_END_DATE'] == row['End Date']) & (info_df['REQUESTER_ID'] == row['Request User']))
-                ]
-            else:
-                match_conditions = [
-                    (info_df['REQUEST_ID'] == row['Request ID'])
-                ]
+            # Cond 1: (REQUEST_ID, MIS_ID)
+            k1 = (req_id, mis_id)
+            if k1 not in dict_group_cond1: dict_group_cond1[k1] = row
             
-            for cond in match_conditions:
-                subset = info_df[cond]
-                if not subset.empty:
-                    matched_row = subset.sort_index()
-                    break
-            # if not matched_row.empty:
-            if not matched_row.empty:
-                first = matched_row.iloc[0]
-                for col in matched_row.columns:
-                    if col in ['REQUEST_START_DATE', 'REQUEST_END_DATE', 'Start Date', 'End Date']:
-                        rule_df.at[idx, col] = pd.to_datetime(first[col], errors='coerce')
-                    else:
-                        rule_df.at[idx, col] = first[col]
+            # Cond 2: (REQUEST_ID, REQUEST_END_DATE, WRITE_PERSON_ID)
+            k2 = (req_id, end_date, write_person)
+            if k2 not in dict_group_cond2: dict_group_cond2[k2] = row
+            
+            # Cond 3: (REQUEST_ID, REQUEST_END_DATE, REQUESTER_ID)
+            k3 = (req_id, end_date, requester)
+            if k3 not in dict_group_cond3: dict_group_cond3[k3] = row
+            
+            # Cond Normal: (REQUEST_ID)
+            if req_id not in dict_normal_cond: dict_normal_cond[req_id] = row
 
-            elif row['Request Type'] != 'nan' and row['Request Type'] != 'Unknown':
-                rule_df.at[idx, 'REQUEST_ID'] = row['Request ID']
-                rule_df.at[idx, 'REQUEST_START_DATE'] = row['Start Date']
-                rule_df.at[idx, 'REQUEST_END_DATE'] = row['End Date']
-                rule_df.at[idx, 'REQUESTER_ID'] = row['Request User']
-                rule_df.at[idx, 'REQUESTER_EMAIL'] = row['Request User'] + '@samsung.com'
+        # 업데이트 대상 컬럼 미리 생성 (성능 경고 방지 및 속도 향상)
+        for col in info_df.columns:
+            if col not in rule_df.columns:
+                rule_df[col] = None
+
+        total = len(rule_df)
+        for i, (idx, row) in enumerate(rule_df.iterrows()):
+            print(f"\r신청 정보 매칭 중: {i + 1}/{total}", end='', flush=True)
+            
+            req_type = row.get('Request Type')
+            req_id = str(row.get('Request ID'))
+            mis_id = str(row.get('MIS ID'))
+            end_date = row.get('End Date')
+            req_user = str(row.get('Request User'))
+            
+            first = None
+            if req_type == 'GROUP':
+                k1 = (req_id, mis_id)
+                k2 = (req_id, end_date, req_user)
+                
+                # 원본 필터링 로직 순서대로 매칭 시도
+                if k1 in dict_group_cond1:
+                    first = dict_group_cond1[k1]
+                elif not pd.isna(end_date):  # pandas NaT 비교 오류 방지 (원본도 NaT는 매칭 실패함)
+                    if k2 in dict_group_cond2:
+                        first = dict_group_cond2[k2]
+                    elif k2 in dict_group_cond3:
+                        first = dict_group_cond3[k2]
+            else:
+                if req_id in dict_normal_cond:
+                    first = dict_normal_cond[req_id]
+
+            if first is not None:
+                for col, val in first.items():
+                    if col in ['REQUEST_START_DATE', 'REQUEST_END_DATE', 'Start Date', 'End Date']:
+                        rule_df.at[idx, col] = pd.to_datetime(val, errors='coerce')
+                    else:
+                        rule_df.at[idx, col] = val
+            elif req_type != 'nan' and req_type != 'Unknown':
+                rule_df.at[idx, 'REQUEST_ID'] = req_id
+                rule_df.at[idx, 'REQUEST_START_DATE'] = row.get('Start Date')
+                rule_df.at[idx, 'REQUEST_END_DATE'] = end_date
+                rule_df.at[idx, 'REQUESTER_ID'] = req_user
+                rule_df.at[idx, 'REQUESTER_EMAIL'] = str(req_user) + '@samsung.com'
         
         print()  # 줄바꿈
     
