@@ -67,7 +67,46 @@ policy_processing:
       "oldcorp.com": "company.com"
     title_bracket_pattern: '^\[([^\[\]]{1,8})\]'
 
-# 5. 엑셀 스타일 설정
+# 5. 공지 대상 분류 설정 (NotificationClassifier)
+columns:
+  all:
+    - "Seq"
+    - "Vsys"
+    - "Rule Name"
+    - "Action"
+    - "REQUEST_ID"
+    - "TITLE"
+    - "REQUEST_START_DATE"
+    - "REQUEST_END_DATE"
+    - "REQUESTER_ID"
+    - "REQUESTER_EMAIL"
+    - "만료여부"
+    - "미사용여부"
+  no_history:
+    - "Seq"
+    - "Vsys"
+    - "Rule Name"
+    - "Action"
+    - "미사용여부"
+  date_columns:
+    - "REQUEST_START_DATE"
+    - "REQUEST_END_DATE"
+
+translated_columns:
+  "Seq": "순번"
+  "Vsys": "Vsys"
+  "Rule Name": "정책명"
+  "Action": "액션"
+  "REQUEST_ID": "신청번호"
+  "TITLE": "신청제목"
+  "REQUEST_START_DATE": "시작일"
+  "REQUEST_END_DATE": "종료일"
+  "REQUESTER_ID": "신청자ID"
+  "REQUESTER_EMAIL": "신청자이메일"
+  "만료여부": "만료여부"
+  "미사용여부": "미사용여부"
+
+# 6. 엑셀 스타일 설정
 excel_styles:
   header_fill_color: "E0E0E0"
   history_fill_color: "CCFFFF"
