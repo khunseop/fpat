@@ -54,26 +54,26 @@ class Pipeline:
             from fpat.policy_deletion_processor.processors.redundancy_processor import RedundancyProcessor
 
             registry = {
-                0: {"class": AutoCollector, "kwargs": {"vendor": vendor, "pri_info": pri_info, "sec_info": sec_info}},
+                0: {"class": AutoCollector, "kwargs": {}},
                 1: {"class": RequestParser, "kwargs": {}},
                 2: {"class": RequestExtractor, "kwargs": {}},
                 3: {"class": MisIdAdder, "kwargs": {}},
                 4: {"class": ApplicationAggregator, "kwargs": {}},
                 5: {"class": RequestInfoAdder, "kwargs": {}},
-                6: {"class": ExceptionHandler, "kwargs": {"mode": "PA"}},
-                7: {"class": ExceptionHandler, "kwargs": {"mode": "SE"}},
+                6: {"class": ExceptionHandler, "kwargs": {"vendor": "paloalto"}},
+                7: {"class": ExceptionHandler, "kwargs": {"vendor": "secui"}},
                 8: {"class": BottomLatestPolicyValidator, "kwargs": {}},
-                9: {"class": DuplicatePolicyClassifier, "kwargs": {}},
+                9: {"class": DuplicatePolicyClassifier, "kwargs": {"mode": "classify"}},
                 10: {"class": DuplicatePolicyClassifier, "kwargs": {"mode": "update"}},
                 11: {"class": DuplicateExpiredCleaner, "kwargs": {}},
-                12: {"class": DuplicateExceptionApplier, "kwargs": {}},
-                13: {"class": MergeHitcount, "kwargs": {}},
-                14: {"class": PolicyUsageProcessor, "kwargs": {"mode": "add"}},
+                12: {"class": MergeHitcount, "kwargs": {}},
+                13: {"class": PolicyUsageProcessor, "kwargs": {"mode": "add"}},
+                14: {"class": PolicyUsageProcessor, "kwargs": {"mode": "update"}},
                 15: {"class": AutoRenewalChecker, "kwargs": {}},
                 16: {"class": NotificationClassifier, "kwargs": {}},
-                17: {"class": RedundancyProcessor, "kwargs": {}}
+                17: {"class": RedundancyProcessor, "kwargs": {}},
+                18: {"class": DuplicateExceptionApplier, "kwargs": {}}
             }
-
 
             return registry.get(int(task_id))
         except ImportError as e:
