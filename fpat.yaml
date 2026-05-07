@@ -92,7 +92,7 @@ columns:
     - "APPROVAL_PERSON_ID"
     - "APPROVAL_PERSON_EMAIL"
     - "APPROVAL_PERSON_NAME"
-    - "APPROVAL_PERSON_DEPT"
+    - "APPROVAL_PERSON_DPET_NAME"
   no_history:
     - "Rule Name"
     - "Source"
@@ -128,7 +128,7 @@ translated_columns:
   "APPROVAL_PERSON_ID": "결재자 ID"
   "APPROVAL_PERSON_EMAIL": "결재자 이메일"
   "APPROVAL_PERSON_NAME": "결재자명"
-  "APPROVAL_PERSON_DEPT": "결재자 부서"
+  "APPROVAL_PERSON_DPET_NAME": "결재자 부서"
 
 # 6. 엑셀 스타일 설정
 excel_styles:
