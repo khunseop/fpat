@@ -65,11 +65,14 @@ class AutoRenewalChecker(BaseProcessor):
         return text
 
     def _safe_to_datetime(self, val):
-        """날짜 형식을 안전하게 변환합니다."""
-        if pd.isna(val) or val == "" or str(val).strip() == "1900-01-01":
+        """날짜 형식을 안전하게 변환합니다. (1900-01-01 이전/오류 데이터 처리 강화)"""
+        if pd.isna(val) or val == "" or str(val).strip() in ["1900-01-01", "1900-01-00", "0", "00:00:00", "1899-12-30"]:
             return pd.Timestamp("1900-01-01")
         try:
-            return pd.to_datetime(val)
+            # 숫자로 들어오는 경우 처리 (Excel serial date)
+            if isinstance(val, (int, float)):
+                return pd.to_datetime(val, unit='D', origin='1899-12-30').normalize()
+            return pd.to_datetime(val).normalize()
         except:
             return pd.Timestamp("1900-01-01")
 
@@ -84,9 +87,9 @@ class AutoRenewalChecker(BaseProcessor):
             logger.error(f"필수 컬럼 누락: {[c for c in required if c not in df.columns]}")
             return None
 
-        # 날짜 형식 표준화
-        df['REQUEST_START_DATE'] = pd.to_datetime(df['REQUEST_START_DATE'])
-        df['REQUEST_END_DATE'] = pd.to_datetime(df['REQUEST_END_DATE'])
+        # 날짜 형식 표준화 (시간 정보 제거 및 안전한 변환)
+        df['REQUEST_START_DATE'] = df['REQUEST_START_DATE'].apply(self._safe_to_datetime)
+        df['REQUEST_END_DATE'] = df['REQUEST_END_DATE'].apply(self._safe_to_datetime)
 
         # 1. 정밀 매칭 (Self Merge): 앞 건의 종료일 == 뒤 건의 시작일
         merged = pd.merge(
@@ -117,11 +120,15 @@ class AutoRenewalChecker(BaseProcessor):
         policy_df = pd.read_excel(policy_file)
         policy_df.columns = [c.strip() for c in policy_df.columns]
 
-        # 매핑용 사전 구축: (ID + 정제된TITLE) -> (Next START, Next END)
-        # renew_df에서 이미 생성된 TITLE_prev_clean 컬럼을 사용합니다.
+        # 날짜 컬럼들 미리 표준화 (비교 오류 및 00:00:00 현상 방지)
+        date_cols = ['REQUEST_START_DATE', 'REQUEST_END_DATE', 'Start Date', 'End Date']
+        for col in date_cols:
+            if col in policy_df.columns:
+                policy_df[col] = policy_df[col].apply(self._safe_to_datetime)
+
+        # 매핑용 사전 구축
         renew_df['key_lookup'] = renew_df['REQUEST_ID'].astype(str) + renew_df['TITLE_prev_clean'].astype(str)
         
-        # 가장 늦은 종료일을 가진 데이터를 상단으로 정렬 후, 첫 번째 값(가장 최신)을 선택 (VLOOKUP 방식)
         lookup_map = renew_df.sort_values(by='REQUEST_END_DATE_next', ascending=False) \
                              .drop_duplicates('key_lookup', keep='first') \
                              .set_index('key_lookup')[['REQUEST_START_DATE_next', 'REQUEST_END_DATE_next']] \
@@ -133,38 +140,40 @@ class AutoRenewalChecker(BaseProcessor):
         for idx, row in policy_df.iterrows():
             print(f"\r날짜 반영 중: {idx + 1}/{total}", end='', flush=True)
             
-            # 정책 파일의 제목도 정제하여 매핑 키 생성
             clean_policy_title = self._remove_bracket_prefix(str(row.get('TITLE', '')))
             key = str(row.get('REQUEST_ID', '')) + clean_policy_title
             
             next_info = lookup_map.get(key)
-            
             if not next_info: continue
 
-            # 날짜 비교 및 업데이트
-            curr_req_start = self._safe_to_datetime(row.get('REQUEST_START_DATE'))
-            curr_req_end = self._safe_to_datetime(row.get('REQUEST_END_DATE'))
-            curr_base_start = self._safe_to_datetime(row.get('Start Date'))
-            curr_base_end = self._safe_to_datetime(row.get('End Date'))
+            # 현재 날짜 및 신규 날짜 가져오기 (이미 Timestamp 객체임)
+            curr_req_start = row.get('REQUEST_START_DATE')
+            curr_req_end = row.get('REQUEST_END_DATE')
+            curr_base_start = row.get('Start Date')
+            curr_base_end = row.get('End Date')
             
             new_start = self._safe_to_datetime(next_info['REQUEST_START_DATE_next'])
             new_end = self._safe_to_datetime(next_info['REQUEST_END_DATE_next'])
 
-            is_updated = False
-            if new_start > curr_req_start and new_start > curr_base_start:
-                policy_df.at[idx, 'REQUEST_START_DATE'] = new_start.strftime('%Y-%m-%d')
-                is_updated = True
-            if new_end > curr_req_end and new_end > curr_base_end:
-                policy_df.at[idx, 'REQUEST_END_DATE'] = new_end.strftime('%Y-%m-%d')
-                is_updated = True
+            is_row_updated = False
             
-            if is_updated: updated_count += 1
+            # Start Date 업데이트 조건: 더 최신 날짜일 경우만 (Timestamp 객체 비교)
+            if new_start > curr_req_start and new_start > curr_base_start:
+                policy_df.at[idx, 'REQUEST_START_DATE'] = new_start
+                is_row_updated = True
+                
+            # End Date 업데이트 조건
+            if new_end > curr_req_end and new_end > curr_base_end:
+                policy_df.at[idx, 'REQUEST_END_DATE'] = new_end
+                is_row_updated = True
+            
+            if is_row_updated: updated_count += 1
 
         print()
         
-        # 결과 저장
+        # 결과 저장 (engine='openpyxl' 명시)
         new_file_name = file_manager.update_version(policy_file)
-        policy_df.to_excel(new_file_name, index=False)
+        policy_df.to_excel(new_file_name, index=False, engine='openpyxl')
         
         print(f"\n✅ 업데이트 완료: 총 {updated_count}건의 날짜가 최신화되었습니다.")
         print(f"📄 최종 결과 저장: {new_file_name}")
